@@ -11,7 +11,7 @@ Token.__index = Token
 
 ---@param name string
 ---@param value any
----@param type integer
+---@param type Type
 ---@param pos Position
 ---@return Token
 function Token.new(name, value, type, pos)

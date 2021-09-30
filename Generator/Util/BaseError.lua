@@ -6,6 +6,8 @@
 
 local Error = require("Generator.Util.Error")
 
+---@alias BaseError {Name: string, Message: string}
+
 local BaseError = {}
 BaseError.__index = BaseError
 

@@ -9,72 +9,139 @@ local Token = require("Generator.Util.Token")
 local Type = require("Generator.Util.Type")
 local Position = require("Generator.Util.Position")
 
+local KeywordSearch = {
+    "Keywords", "Identifiers"
+}
+
+---@param source string
+---@param version table<string, table<string | number, Token | BaseError>>
 local function GenerateTokens(source, version)
     
     local tokens, pos = {}, Position.new(0)
     local head = LexerHead.new(source, pos)
     
-    while head:GoNext() ~= "" do
-        local char = head:Current()
-        local token
+    local function AddToken(token)
         
-        -- Try to find operator
-        for _, value in pairs(version.Operators) do
-            if value.Value == char then
-                token = Token.new(value.Name, value.Value, value.Type)
+        local past = tokens[#tokens]
+        if past and past:IsType(token) then
+            past.Value = past.Value .. token.Value
+        else
+            tokens[#tokens + 1] = token
+        end
+    end
+    
+    local function TrimWhitespaces()
+        if not version.INDENTATION[head:Current()] or head:Current() ~= "\n" then
+            return
+        end
+        
+        local start, stop = pos.Counter, pos.Counter
+        while true do
+            local char = head:Current()
+            
+            if char == "\n" then
+                AddToken(Token.new("WhiteSpace", source:sub(start, stop), Type("WhiteSpace")))
+            elseif version.INDENTATION[char] then
+                stop = stop + 1
+            else
                 break
             end
+            head:GoNext()
         end
+        AddToken(Token.new("WhiteSpace", source:sub(start, stop), Type("WhiteSpace")))
+    end
+    
+    
+    while head:GoNext() do
+        TrimWhitespaces()
+        local char = head:Current()
         
-        if not token then
-            -- TODO: Keywors and Functions
-        end
-        
-        if not token then
-            -- Find number
-            if char:match("%d") then
-                local value, indot = char, false
-                while head:GoNext() do
-                    char = head:Current()
-                    if char == "." then
-                        if indot then
-                            error("Invalid number")
-                        end
-                        indot = true
-                        value = value .. char
-                    elseif char:match("%d") then
-                        value = value .. char
-                    else
-                        head:GoLast()
-                        break
-                    end
+        if char == "" then
+            break
+        elseif char == "\"" or char == "\'" then
+            --TODO: Implement escape characters
+            
+            AddToken(Token("StartString", char, Type("StartString")))
+            local value, last = "", nil
+            while head:GoNext() ~= "" do
+                char = head:Current()
+                if char == "\"" or char == "\'" then
+                    last = char
+                    break
+                else
+                    value = value .. char
                 end
-                token = Token.new("Number", value, Type.new("Number"))
             end
-        end
+            AddToken(Token("String", value, Type.new("String")))
+            AddToken(Token("EndString", last, Type("EndString")))
         
-        if not token then
-            -- Find string
-            -- TODO: Parse string before lexing
-            if char == "\"" then
-                local value = char
-                while head:GoNext() do
-                    char = head:Current()
-                    if char == "\"" then
-                        value = value .. char
-                        break
-                    else
-                        value = value .. char
+        elseif version.IDEN[char] then
+            --TODO: Should this check for keywords?
+            
+            local value = char
+            while version.IDEN[head:Next()] do
+                head:GoNext()
+                value = value .. head:Current()
+            end
+            
+            if version.KEYWORDS[value] then
+                AddToken(Token("Keyword", value, Type("Keyword")))
+            else
+                AddToken(Token("Identifier", value, Type("Identifier")))
+            end
+        
+        elseif version.NUM[char] or (char == "." and version.NUM[head:Next()]) then
+            
+            ---TODO: Support for hexadecimal numbers
+            local value, isdot = char, false
+            while version.NUM[head:Next()] or head:Next() == "." or head:Next():lower() == "e" do
+                head:GoNext()
+                local new = head:Current()
+                if new == "." then
+                    if isdot then
+                        return error("Invalid number")
                     end
+                    isdot = true
+                elseif new:lower() == "e" then
+                    if head:Next() == "-" then
+                        value = value .. head:GoNext()
+                    end
+                else
+                    value = value .. new
                 end
-                token = Token.new("String", value, Type.new("String"))
             end
-        end
-        
-        if token then
-            table.insert(tokens, token)
-        elseif not char:match("%s") then
-            return nil, version.Errors.UnknownSymbol:Format(pos:Copy(), char)
+            
+            AddToken(Token("Number", value, Type("Number")))
+        elseif char == "." then
+            
+            local value = char
+            for _ = 1, 2 do
+                if head:Next() == "." then
+                    value = value .. head:GoNext()
+                else
+                    break
+                end
+            end
+            
+            if #value == 3 then
+                AddToken(Token("Vararg", value, Type("Vararg")))
+            else
+                AddToken(Token("Symbol", value, Type("Symbol")))
+            end
+            
+        elseif version.EQUALITY[char] then
+            
+            if version.EQUALITY[head:Next()] then
+                char = char .. head:GoNext()
+            end
+            AddToken(Token("Symbol", char, Type("Symbol")))
+            
+        elseif version.SYMBOLS[char] then
+            if version.OPERATORS[char] then
+                AddToken(Token("Operator", char, Type("Operator")))
+            else
+                AddToken(Token("Symbol", char, Type("Symbol")))
+            end
         end
     end
     
@@ -85,5 +152,5 @@ end
 ---@param Source string
 return function(Source)
     
-    return GenerateTokens(Source, require("Generator.Versions.Lua51"))
+    return GenerateTokens(Source, require("Versions.Lua51"))
 end

@@ -4,6 +4,8 @@
     28/09/2021
 --]]
 
+---@alias Error {Name: string, Message: string, Pos: Position | nil}
+
 local Error = {}
 Error.__index = Error
 
