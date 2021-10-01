@@ -30,9 +30,8 @@ return function(tokens, version)
         msg = msg or "Unexpected token"
         local token, err = nil, delta
         repeat
-            token = tokens[pos.Counter + delta]
-            err = err + (delta > 0 and 1 or -1)
-        until token and not token:IsType("WhiteSpace")
+            token, err = tokens[pos.Counter + err], err + (delta > 0 and 1 or -1)
+        until not token or not token:Is("WhiteSpace")
         
         if not token then
             error(msg .. " at " .. pos.Counter + delta)
@@ -43,21 +42,15 @@ return function(tokens, version)
     local function GetType(delta, _type, msg)
         msg = msg or "Unexpected token type"
         local token = GetOrError(delta, "Unexpected nil value")
-        if type(_type) == "string" then
-            if not token:Is(_type) then
-                error(msg .. " at " .. pos.Counter + delta)
-            end
+        if type(_type) == "string" and not token:Is(_type) then
+            error(msg .. " at " .. pos.Counter + delta)
         elseif type(_type) == "table" then
-            local found = false
             for _, t in pairs(_type) do
                 if token:Is(t) then
-                    found = true
-                    break
+                    return token
                 end
             end
-            if not found then
-                error(msg .. " at " .. pos.Counter + delta)
-            end
+            error(msg .. " at " .. pos.Counter + delta)
         end
         
         return token
@@ -65,7 +58,7 @@ return function(tokens, version)
     
     local function GetBinOp(type, tofind, ...)
         local left = tofind(...)
-        repeat
+        while head:Next() do
             local op = GetType(1, type, "Invalid token")
             if not op then
                 break
@@ -75,16 +68,16 @@ return function(tokens, version)
             
             local right = tofind(...)
             left = BinOp(op, left, right)
-        until not left or not right or not op
+        end
         
         return left
     end
     
-    while head:Next() do
-        local token = head:GoNext()
-        table.insert(nodes, GetBinOp("Operator", GetType , 0, "Number"))
+    while head:GoNext() do
+        if head:Current():Is("Number") then
+            nodes[#nodes+1] = GetBinOp("Operator", GetType, 0, {"BinOp", "Number"})
+        end
     end
     
-    print("Returtning")
     return nodes
 end

@@ -24,7 +24,7 @@ local NUM = ToTable("0123456789")
 local NEW_LINE = Token("NewLine", "\n", Type("NewLine"))
 local HEX = ToTable("0123456789abcdefABCDEF")
 
-local SYMBOLS = ToTable("+-*/^,(){}[]")
+local SYMBOLS = ToTable("+-*/^#%,(){}[]")
 local OPERATORS = ToTable("+-*/^#%")
 local EQUALITY = ToTable("=><~")
 
