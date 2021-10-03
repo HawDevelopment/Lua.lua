@@ -11,6 +11,12 @@ ParserUtil.__index = ParserUtil
 
 local SKIP_WHITESPACE = true
 
+local UNARY_OPERATORS = { "-", "+" }
+local TERM_OPERATORS = {"*", "/", "%", "^"}
+local EXPR_OPERATORS = {"+", "-"}
+
+local ERR_TERM_OR_EXPR = "Unexpected symbol: Expected a term or expression, got \"%s\" at %s"
+
 function ParserUtil.new(tokens, head)
     local self = setmetatable({}, ParserUtil)
     
@@ -59,6 +65,25 @@ function ParserUtil:GetType(delta, _type, doerror, error_message, nil_message)
     return token
 end
 
+function ParserUtil:GetIdentifiers(comma)
+    if comma == nil then
+        comma = true
+    end
+    
+    local idens = {}
+    while self.Head:Current() and self.Head:Current():Is("Identifier") do
+        table.insert(idens, self.Head:Current())
+        self.Head:GoNext()
+        if comma and self.Head:Current().Value == "," then
+            self.Head:GoNext()
+        else
+            break
+        end
+    end
+    
+    return idens
+end
+
 --#endregion
 
 --#region Getting tokens
@@ -74,52 +99,157 @@ end
 
 function ParserUtil:GetBinOp(operators, func, ...)
     local left = func(...)
-    while self.Head:Next() and ValueInTable(operators, self.Head:Next().Value) do
-        local op = self:Get(1, true)
-        if not op or not op:Is("Operator") then
-            break
-        end
-        self.Head:GoNext()
+    
+    while self.Head:Next() and self.Head:Next():Is("Operator") and ValueInTable(operators, self.Head:Next().Value) do
+        local op = self.Head:GoNext()
         self.Head:GoNext()
         
         local right = func(...)
         if not right then
             error("Unexpected token: Expected a term or expression after operator at " .. self.Pos.Counter)
         end
-        left = Node.new("BinOp", {op, left, right}, "BinOp", self.Pos.Counter)
+        left = Node.new("BinaryExpression", {op, left, right}, "Expression", self.Pos.Counter)
     end
     
     return left
 end
 
-function ParserUtil:GetLiteral(_type)
-    local token = self:Get(0, false, "Expected Literal got nil")
+function ParserUtil:GetLiteral()
+    local token = self:Get(0, false)
     if not token then
         return nil
     end
     
-    local correct = false
-    if type(_type) == "string" then
-        correct = token:Is(_type)
-    elseif type(_type) == "table" then
-        correct = ValueInTable(_type, token.Name) or ValueInTable(_type, token.Type)
+    if token:Is("Identifier") then
+        return Node.new("Identifier", token.Value, "Identifier", self.Pos.Counter)
+    elseif token:Is("Operator") then
+        -- Unary operator
+        local unary = self:GetUnary()
+        if unary then
+            return unary
+        end
+        error(ERR_TERM_OR_EXPR:format(token.Value, self.Pos.Counter))
+        
+    elseif token:Is("Symbol") then
+        -- Parantheses
+        if token.Value == "(" then
+            self.Head:GoNext()
+            local expr = self:GetExpr()
+            if expr and self.Head:GoNext().Value == ")" then
+                return expr
+            end
+        end
+    else
+        if token:IsType("Number") then
+            return Node.new("NumericLiteral", token.Value, "Literal", self.Pos.Counter)
+        elseif token:IsType("String") then
+            return Node.new("StringLiteral", token.Value, "Literal", self.Pos.Counter)
+        end
+        return nil
+    end
+end
+
+function ParserUtil:GetUnary()
+    local token = self:Get(0, false, "Expected Unary got nil")
+    if not token then
+        return nil
     end
     
-    if correct then
-        return Node.new("Literal", token.Value, "Literal", self.Pos.Counter)
+    if token:Is("Operator") and ValueInTable(UNARY_OPERATORS, token.Value) then
+        self.Head:GoNext()
+        local num = self:GetLiteral("Number")
+        if not num then
+            error("Expected a number after unary operator at " .. self.Pos.Counter)
+        end
+        return Node.new("Unary", {token, num}, "Unary", self.Pos.Counter)
     end
-    return nil
+    return nil 
 end
 
-local TERM_OPERATORS = {"*", "/", "%", "^"}
 function ParserUtil:GetTerm()
-    return self:GetBinOp(TERM_OPERATORS, self.GetLiteral, self, "Number")
+    return self:GetBinOp(TERM_OPERATORS, self.GetLiteral, self)
 end
 
-local EXPR_OPERATORS = {"+", "-"}
 function ParserUtil:GetExpr()
     return self:GetBinOp(EXPR_OPERATORS, self.GetTerm, self)
 end
+
+--#region Variables
+
+function ParserUtil:GetVariable()
+    --TODO: Add table values
+    
+    -- Is it local
+    local islocal = false
+    if self.Head:Current():Is("Keyword") and self.Head:Current().Value == "local" then
+        islocal = true
+        self.Head:GoNext()
+    end
+    
+    -- Get names
+    local idens = self:GetIdentifiers()
+    if islocal and #idens == 0 then
+        error("Expected an identifier after \"local\" at " .. self.Pos.Counter)
+    end
+    if #idens == 0 then
+        if self.Head:Next().Value == "=" then
+            error("Expected an identifier in variable at " .. self.Pos.Counter)
+        else
+            return
+        end
+    end
+    
+    self.Head:GoNext()
+    
+    -- Get expr
+    local expr = self:GetLiteral()
+    if not expr then
+        error("Expected an expression after \"=\" at " .. self.Pos.Counter)
+    end
+    
+    if islocal then
+        return Node.new("LocalStatement", {idens, expr}, "Variable", self.Pos.Counter)
+    else
+        return Node.new("AssignmentStatement", {idens, expr}, "Variable", self.Pos.Counter)
+    end
+end
+
+--#endregion
+
+--#region Functions
+
+function ParserUtil:GetArguments()
+    return self:GetIdentifiers(true)
+end
+
+function ParserUtil:GetCallStatement()
+    
+    local cur = self:Get(0, true)
+    if not (self.Head:Current() and self.Head:Current():Is("Identifier")) then
+        return
+    end
+    
+    -- Is call
+    local start = self:Get(1, true)
+    if start:Is("Symbol") and start.Value == "(" then
+        self.Head:GoNext()
+        self.Head:GoNext()
+        
+        local args = self:GetArguments()
+        
+        if self.Head:Current().Value == ")" then
+            self.Head:GoNext()
+        else
+            error("Expected \")\" after arguments at " .. self.Pos.Counter)
+        end
+        
+        return Node.new("CallExpression", {cur, args}, "Expression", self.Pos.Counter)
+    else
+        return
+    end
+end
+
+--#endregion
 
 --#endregion
 
@@ -128,6 +258,5 @@ function ParserUtil:Destroy()
         self[key] = nil
     end
 end
-
 
 return ParserUtil

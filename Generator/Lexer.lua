@@ -6,7 +6,6 @@
 
 local LexerHead = require("Generator.Util.LexerHead")
 local Token = require("Generator.Util.Token")
-local Type = require("Generator.Util.Type")
 local Position = require("Generator.Util.Position")
 
 local KeywordSearch = {
@@ -40,7 +39,7 @@ local function GenerateTokens(source, version)
             local char = head:Current()
             
             if char == "\n" then
-                AddToken(Token.new("WhiteSpace", source:sub(start, stop), Type("WhiteSpace")))
+                AddToken(Token.new("WhiteSpace", source:sub(start, stop), "WhiteSpace"))
             elseif version.INDENTATION[char] then
                 stop = stop + 1
             else
@@ -48,7 +47,7 @@ local function GenerateTokens(source, version)
             end
             head:GoNext()
         end
-        AddToken(Token.new("WhiteSpace", source:sub(start, stop), Type("WhiteSpace")))
+        AddToken(Token.new("WhiteSpace", source:sub(start, stop), "WhiteSpace"))
     end
     
     
@@ -61,7 +60,7 @@ local function GenerateTokens(source, version)
         elseif char == "\"" or char == "\'" then
             --TODO: Implement escape characters
             
-            AddToken(Token("StartString", char, Type("StartString")))
+            AddToken(Token("String", char, "String"))
             local value, last = "", nil
             while head:GoNext() ~= "" do
                 char = head:Current()
@@ -72,8 +71,8 @@ local function GenerateTokens(source, version)
                     value = value .. char
                 end
             end
-            AddToken(Token("String", value, Type.new("String")))
-            AddToken(Token("EndString", last, Type("EndString")))
+            AddToken(Token("StringLiteral", value, "String"))
+            AddToken(Token("String", last, "String"))
         
         elseif version.IDEN[char] then
             --TODO: Should this check for keywords?
@@ -85,9 +84,9 @@ local function GenerateTokens(source, version)
             end
             
             if version.KEYWORDS[value] then
-                AddToken(Token("Keyword", value, Type("Keyword")))
+                AddToken(Token("Keyword", value, "Keyword"))
             else
-                AddToken(Token("Identifier", value, Type("Identifier")))
+                AddToken(Token("Identifier", value, "Identifier"))
             end
         
         elseif version.NUM[char] or (char == "." and version.NUM[head:Next()]) then
@@ -111,7 +110,7 @@ local function GenerateTokens(source, version)
                 end
             end
             
-            AddToken(Token("Number", value, Type("Number")))
+            AddToken(Token("NumberLiteral", value, "Number"))
         elseif char == "." then
             
             local value = char
@@ -124,9 +123,9 @@ local function GenerateTokens(source, version)
             end
             
             if #value == 3 then
-                AddToken(Token("Vararg", value, Type("Vararg")))
+                AddToken(Token("Vararg", value, "Symbol"))
             else
-                AddToken(Token("Symbol", value, Type("Symbol")))
+                AddToken(Token("Symbol", value, "Symbol"))
             end
             
         elseif version.EQUALITY[char] then
@@ -134,13 +133,13 @@ local function GenerateTokens(source, version)
             if version.EQUALITY[head:Next()] then
                 char = char .. head:GoNext()
             end
-            AddToken(Token("Symbol", char, Type("Symbol")))
+            AddToken(Token("Symbol", char, "Symbol"))
             
         elseif version.SYMBOLS[char] then
             if version.OPERATORS[char] then
-                AddToken(Token("Operator", char, Type("Operator")))
+                AddToken(Token("Operator", char, "Operator"))
             else
-                AddToken(Token("Symbol", char, Type("Symbol")))
+                AddToken(Token("Symbol", char, "Symbol"))
             end
         end
     end

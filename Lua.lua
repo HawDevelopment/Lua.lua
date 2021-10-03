@@ -46,8 +46,8 @@ if DO_CLI then
         print("Parsing:")
         local parsed = Parser(tokens)
         PrintTokens(parsed)
-        print("Interpreting:")
-        Interpreter(parsed)
+        -- print("Interpreting:")
+        -- Interpreter(parsed)
         
     elseif command == "sim" then
         
@@ -64,8 +64,8 @@ if DO_CLI then
             print("Parsing:")
             local parsed = Parser(tokens)
             PrintTokens(parsed)
-            print("Interpreting:")
-            Interpreter(parsed)
+            -- print("Interpreting:")
+            -- Interpreter(parsed)
         end
     end
 end

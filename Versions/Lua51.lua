@@ -5,36 +5,20 @@
 --]]
 
 local Token = require("Generator.Util.Token")
-local Type = require("Generator.Util.Type")
 local ToTable = require("Versions.Util.ToTable")
-
--- Note: This is base error!
-local Error = require("Generator.Util.BaseError")
-
-local Operator = Type("Operator")
-local Keyword = Type("Keyword")
-local Identifier = Type("Identifier")
-local Comma = Type("Comma")
-local Dot = Type("Dot")
-local Colon = Type("Colon")
 
 local INDENTATION = ToTable("   ")
 local IDEN = ToTable("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_")
 local NUM = ToTable("0123456789")
-local NEW_LINE = Token("NewLine", "\n", Type("NewLine"))
+local NEW_LINE = Token("NewLine", "\n", "NewLine")
 local HEX = ToTable("0123456789abcdefABCDEF")
 
 local SYMBOLS = ToTable("+-*/^#%,(){}[]")
 local OPERATORS = ToTable("+-*/^#%")
 local EQUALITY = ToTable("=><~")
 
-local KEYWORDS = {
-    Token("If", "if", Keyword),
-    Token("Else", "else", Keyword),
-    Token("End", "end", Keyword),
-    Token("True", "true", Keyword),
-    Token("False", "false", Keyword),
-}
+local KEYWORDS = ToTable("and break do else elseif end false for function if in local nil not or repeat return then true until while", nil, "[^%s]+")
+
 return {
     SYMBOLS = SYMBOLS,
     OPERATORS = OPERATORS,

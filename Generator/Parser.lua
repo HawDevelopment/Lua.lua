@@ -5,20 +5,9 @@
 --]]
 
 local Node = require("Generator.Util.Node")
-local Type = require("Generator.Util.Type")
 local LexerHead = require("Generator.Util.LexerHead")
 local Position = require("Generator.Util.Position")
 local ParserUtil = require("Generator.Util.ParserUtil")
-
-local IGNORE_WHITESPACE = true
-
-local function BinOp(op, left, right)
-    return Node("BinOp", {op, left, right}, Type("BinOp"))
-end
-
-local function LiteralExpr(value)
-    return Node("LiteralExpr", value, Type("LiteralExpr"))
-end
 
 return function(tokens, version)
     version = require("Versions.Lua51")
@@ -29,8 +18,23 @@ return function(tokens, version)
     local util = ParserUtil.new(tokens, head)
     
     while head:GoNext() do
-        if head:Current():Is("Number") then
-            nodes[#nodes+1] = util:GetExpr()
+        local token = head:Current()
+        
+        if token:Is("Keyword") and token.Value == "local" then
+            nodes[#nodes + 1] = util:GetVariable()
+        elseif token:Is("Identifier") then
+            local check = pos.Counter
+            while head:Next() and (head:Next():Is("Identifier") or head:Next().Value == ",") do
+                head:GoNext()
+                check = check + 1
+            end
+            if head:Next() and head:Next().Value == "=" then
+                nodes[#nodes + 1] = util:GetVariable()
+            else
+                nodes[#nodes + 1] = util:GetExpr()
+            end
+        elseif token:Is("Number") then
+            nodes[#nodes + 1] = util:GetExpr()
         end
     end
     

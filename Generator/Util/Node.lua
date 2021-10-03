@@ -5,14 +5,14 @@
 --]]
 
 
----@alias Node {Name: string, Value: table<any, any>, Type: Type, Pos: Position}
+---@alias Node {Name: string, Value: table<any, any>, Type: string | nil, Pos: Position}
 
 local Node = {}
 Node.__index = Node
 
 ---@param name string
 ---@param value any
----@param type Type
+---@param type string | nil
 ---@param pos Position
 ---@return Node
 function Node.new(name, value, type, pos)
@@ -61,7 +61,7 @@ end
 function TableToString(tab, indent)
     local str, stop = "{", (indent or "") .. "}"
     indent = indent and indent .. "\t" or "\t"
-    if next(tab, 2) then
+    if tab[2] then
         str = str .. "\n"
         
         for k, v in ipairs(tab) do
