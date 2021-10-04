@@ -38,55 +38,30 @@ end
 
 --#region Util
 
-function ParserUtil:Get(delta, doerror, error_message)
-    local token, err, toskip = nil, delta, delta > 0 and 1 or -1
-    repeat
-        token, err = self.Tokens[self.Pos.Counter + err], err + toskip
-    until not token or (SKIP_WHITESPACE and not token:Is("WhiteSpace"))
-    
-    if doerror and not token then
-        error_message = error_message or "Unexpected token"
-        error(error_message .. " at " .. self.Pos.Counter + delta)
-    end
-    return token
-end
-
-function ParserUtil:GetType(delta, _type, doerror, error_message, nil_message)
-    error_message = error_message or "Unexpected token type"
-    nil_message = nil_message or "Unexpected nil"
-    
-    local token = self:Get(delta, doerror, nil_message)
-    if type(_type) == "string" then
-        if not token:Is(_type) and doerror then
-            error(error_message .. " at " .. self.Pos.Counter + delta)
-        end
-    elseif type(_type) == "table" then
-        for _, t in pairs(_type) do
-            if token:Is(t) then
-                return token
-            end
-        end
-        if doerror then
-            error(error_message .. " at " .. self.Pos.Counter + delta)
-        end
-    end
-    
-    return token
-end
-
-function ParserUtil:GetSeperated(tofind, comma)
+function ParserUtil:GetSeperated(tofind, comma, ...)
     if comma == nil then
         comma = true
     end
     
     local idens = {}
-    while
-        self.Head:Current() and
-        (type(tofind) == "table" and ValueInTable(tofind, self.Head:Current().Name) or self.Head:Current():Is(tofind))
-    do
-        table.insert(idens, self.Head:Current())
-        self.Head:GoNext()
-        if comma and self.Head:Current().Value == "," then
+    while true do
+        local cur = self.Head:Current()
+        
+        if type(tofind) == "table" then
+            if not ValueInTable(tofind, cur.Name) or ValueInTable(tofind, cur.Type) then
+                break
+            end
+        elseif type(tofind) == "string" then
+            if not (cur.Name == tofind or cur.Type == tofind) then
+                break
+            end
+            self.Head:GoNext()
+        elseif type(tofind) == "function" then
+            cur = tofind(...)
+        end
+        
+        table.insert(idens, cur)
+        if comma and self.Head:Current() and self.Head:Current().Value == "," then
             self.Head:GoNext()
         else
             break
@@ -102,7 +77,6 @@ end
 
 function ParserUtil:GetBinOp(operators, func, ...)
     local left = func(...)
-    print(1)
     while self.Head:Current() and self.Head:Current():Is("Operator") and ValueInTable(operators, self.Head:Current().Value) do
         local op = self.Head:Current()
         self.Head:GoNext()
@@ -112,9 +86,7 @@ function ParserUtil:GetBinOp(operators, func, ...)
             error("Unexpected token: Expected a term or expression after operator at " .. self.Pos.Counter)
         end
         left = Node.new("BinaryExpression", {op, left, right}, "Expression", self.Pos.Counter)
-        print(2)
     end
-    print(3)
     return left
 end
 
@@ -124,8 +96,6 @@ function ParserUtil:GetLiteral()
         return nil
     end
     self.Head:GoNext()
-    print(token.Name)
-    
     if token:Is("Identifier") then
         
         return Node.new("Identifier", token.Value, "Identifier", self.Pos.Counter)
@@ -153,6 +123,7 @@ function ParserUtil:GetLiteral()
             end
         end
     end
+    self.Head:GoLast()
     return nil
 end
 
@@ -195,11 +166,10 @@ function ParserUtil:GetVariable()
     
     -- Get names
     local idens = self:GetSeperated("Identifier", true)
-    if islocal and #idens == 0 then
-        error("Expected an identifier after \"local\" at " .. self.Pos.Counter)
-    end
     if #idens == 0 then
-        if self.Head:Next().Value == "=" then
+        if islocal then
+            error("Expected an identifier after \"local\" at " .. self.Pos.Counter)
+        elseif self.Head:Next().Value == "=" then
             error("Expected an identifier in variable at " .. self.Pos.Counter)
         else
             return
@@ -209,28 +179,15 @@ function ParserUtil:GetVariable()
     self.Head:GoNext()
     
     -- Get expr
-    local exprs = {}
-    while true do
-        if not self.Head:Current() then
-            break
+    local init
+    if self.Head:Current() and self.Head:Current().Value == "=" then
+        init = self:GetSeperated(self.GetLiteral, true, self)
+        if #init == 0 then
+            error("Expected an expression after \"=\" at " .. self.Pos.Counter)
         end
-        local before = self.Pos.Counter
-        local expr = self:GetExpr()
-        if not expr then
-            self.Pos.Counter = before
-            break
-        end
-        table.insert(exprs, expr)
-    end
-    if not #exprs == 0 then
-        error("Expected an expression after \"=\" at " .. self.Pos.Counter)
     end
     
-    if islocal then
-        return Node.new("LocalStatement", {idens, exprs}, "Variable", self.Pos.Counter)
-    else
-        return Node.new("AssignmentStatement", {idens, exprs}, "Variable", self.Pos.Counter)
-    end
+    return Node.new(islocal and "LocalStatement" or "AssignmentStatement", {idens, init}, "Variable", self.Pos.Counter)
 end
 
 --#endregion
