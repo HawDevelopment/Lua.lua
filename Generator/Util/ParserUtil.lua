@@ -12,7 +12,7 @@ ParserUtil.__index = ParserUtil
 local SKIP_WHITESPACE = true
 
 local UNARY_OPERATORS = { "-", "+" }
-local TERM_OPERATORS = {"*", "/", "%", "^"}
+local TERM_OPERATORS = {"*", "/", "%"}
 local EXPR_OPERATORS = {"+", "-"}
 
 local ERR_TERM_OR_EXPR = "Unexpected symbol: Expected a term or expression, got \"%s\" at %s"
@@ -111,18 +111,6 @@ function ParserUtil:GetLiteral()
         elseif token:IsType("String") then
             return Node.new("StringLiteral", token.Value, "Literal", self.Pos.Counter)
         end
-    elseif IsUnaryToken(token) then
-        -- Unary operator
-        
-        -- Go last since we need to know if it's a unary operator
-        self.Head:GoLast()
-        
-        local unary = self:GetUnary()
-        if unary then
-            return unary
-        else
-            error("Unexpected token: Expected a term or expression after operator at " .. self.Pos.Counter)
-        end
         
     elseif token:Is("Symbol") then
         -- Parantheses
@@ -138,29 +126,48 @@ function ParserUtil:GetLiteral()
     return nil
 end
 
-function ParserUtil:GetUnary()
-    local token = self.Head:Current()
-    if not token then
-        return nil
+-- Math
+do
+    function ParserUtil:GetUnary()
+        local token = self.Head:Current()
+        if not token then
+            return nil
+        end
+        
+        if IsUnaryToken(token) then
+            self.Head:GoNext()
+            local num = self:GetLiteral()
+            if not num then
+                error("Expected a number after unary operator at " .. self.Pos.Counter)
+            end
+            return Node.new("Unary", {token, num}, "Unary", self.Pos.Counter)
+        end
+        return nil 
     end
     
-    if IsUnaryToken(token) then
-        self.Head:GoNext()
-        local num = self:GetLiteral()
-        if not num then
-            error("Expected a number after unary operator at " .. self.Pos.Counter)
-        end
-        return Node.new("Unary", {token, num}, "Unary", self.Pos.Counter)
+    function ParserUtil:GetPower()
+        return self:GetBinOp({"^"}, self.GetLiteral, self)
     end
-    return nil 
-end
-
-function ParserUtil:GetTerm()
-    return self:GetBinOp(TERM_OPERATORS, self.GetLiteral, self)
-end
-
-function ParserUtil:GetExpr()
-    return self:GetBinOp(EXPR_OPERATORS, self.GetTerm, self)
+    
+    function ParserUtil:GetFactor()
+        local cur = self.Head:Current()
+        if not cur then
+            return nil
+        end
+        
+        if IsUnaryToken(cur) then
+            return self:GetUnary()
+        end
+        return self:GetPower()
+    end
+    
+    function ParserUtil:GetTerm()
+        return self:GetBinOp(TERM_OPERATORS, self.GetFactor, self)
+    end
+    
+    function ParserUtil:GetExpr()
+        return self:GetBinOp(EXPR_OPERATORS, self.GetTerm, self)
+    end
 end
 
 --#region Variables
