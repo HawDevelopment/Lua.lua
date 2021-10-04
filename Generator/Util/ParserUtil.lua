@@ -38,6 +38,10 @@ end
 
 --#region Util
 
+function IsUnaryToken(token)
+    return (token:IsType("Keyword") and token.Value == "not") or (token:Is("Operator") and ValueInTable(UNARY_OPERATORS, token.Value))
+end
+
 function ParserUtil:GetSeperated(tofind, comma, ...)
     if comma == nil then
         comma = true
@@ -96,6 +100,7 @@ function ParserUtil:GetLiteral()
         return nil
     end
     self.Head:GoNext()
+    
     if token:Is("Identifier") then
         
         return Node.new("Identifier", token.Value, "Identifier", self.Pos.Counter)
@@ -106,11 +111,17 @@ function ParserUtil:GetLiteral()
         elseif token:IsType("String") then
             return Node.new("StringLiteral", token.Value, "Literal", self.Pos.Counter)
         end
-    elseif token:Is("Operator") then
+    elseif IsUnaryToken(token) then
         -- Unary operator
+        
+        -- Go last since we need to know if it's a unary operator
+        self.Head:GoLast()
+        
         local unary = self:GetUnary()
         if unary then
             return unary
+        else
+            error("Unexpected token: Expected a term or expression after operator at " .. self.Pos.Counter)
         end
         
     elseif token:Is("Symbol") then
@@ -128,12 +139,12 @@ function ParserUtil:GetLiteral()
 end
 
 function ParserUtil:GetUnary()
-    local token = self:Get(0, false, "Expected Unary got nil")
+    local token = self.Head:Current()
     if not token then
         return nil
     end
     
-    if token:Is("Operator") and ValueInTable(UNARY_OPERATORS, token.Value) then
+    if IsUnaryToken(token) then
         self.Head:GoNext()
         local num = self:GetLiteral()
         if not num then
@@ -213,7 +224,6 @@ function ParserUtil:GetCallStatement()
         self.Head:GoNext()
         
         local args = self:GetArguments()
-        print(self:Get(-1):rep())
         if self.Head:Current().Value == ")" then
             self.Head:GoNext()
         else
