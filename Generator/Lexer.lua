@@ -8,10 +8,6 @@ local LexerHead = require("Generator.Util.LexerHead")
 local Token = require("Generator.Util.Token")
 local Position = require("Generator.Util.Position")
 
-local KeywordSearch = {
-    "Keywords", "Identifiers"
-}
-
 ---@param source string
 ---@param version table<string, table<string | number, Token | BaseError>>
 local function GenerateTokens(source, version)
@@ -22,7 +18,7 @@ local function GenerateTokens(source, version)
     local function AddToken(token)
         
         local past = tokens[#tokens]
-        if past and past:IsType(token) then
+        if past and past:IsType(token) and (token.Type == "String" or token.Type == "Number") then
             past.Value = past.Value .. token.Value
         else
             tokens[#tokens + 1] = token

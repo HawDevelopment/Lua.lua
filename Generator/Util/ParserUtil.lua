@@ -17,6 +17,15 @@ local EXPR_OPERATORS = {"+", "-"}
 
 local ERR_TERM_OR_EXPR = "Unexpected symbol: Expected a term or expression, got \"%s\" at %s"
 
+local function ValueInTable(tab, value)
+    for _, val in pairs(tab) do
+        if val == value then
+            return true
+        end
+    end
+    return false
+end
+
 function ParserUtil.new(tokens, head)
     local self = setmetatable({}, ParserUtil)
     
@@ -65,13 +74,16 @@ function ParserUtil:GetType(delta, _type, doerror, error_message, nil_message)
     return token
 end
 
-function ParserUtil:GetIdentifiers(comma)
+function ParserUtil:GetSeperated(tofind, comma)
     if comma == nil then
         comma = true
     end
     
     local idens = {}
-    while self.Head:Current() and self.Head:Current():Is("Identifier") do
+    while
+        self.Head:Current() and
+        (type(tofind) == "table" and ValueInTable(tofind, self.Head:Current().Name) or self.Head:Current():Is(tofind))
+    do
         table.insert(idens, self.Head:Current())
         self.Head:GoNext()
         if comma and self.Head:Current().Value == "," then
@@ -88,20 +100,11 @@ end
 
 --#region Getting tokens
 
-local function ValueInTable(tab, value)
-    for _, val in pairs(tab) do
-        if val == value then
-            return true
-        end
-    end
-    return false
-end
-
 function ParserUtil:GetBinOp(operators, func, ...)
     local left = func(...)
-    
-    while self.Head:Next() and self.Head:Next():Is("Operator") and ValueInTable(operators, self.Head:Next().Value) do
-        local op = self.Head:GoNext()
+    print(1)
+    while self.Head:Current() and self.Head:Current():Is("Operator") and ValueInTable(operators, self.Head:Current().Value) do
+        local op = self.Head:Current()
         self.Head:GoNext()
         
         local right = func(...)
@@ -109,44 +112,48 @@ function ParserUtil:GetBinOp(operators, func, ...)
             error("Unexpected token: Expected a term or expression after operator at " .. self.Pos.Counter)
         end
         left = Node.new("BinaryExpression", {op, left, right}, "Expression", self.Pos.Counter)
+        print(2)
     end
-    
+    print(3)
     return left
 end
 
 function ParserUtil:GetLiteral()
-    local token = self:Get(0, false)
+    local token = self.Head:Current()
     if not token then
         return nil
     end
+    self.Head:GoNext()
+    print(token.Name)
     
     if token:Is("Identifier") then
+        
         return Node.new("Identifier", token.Value, "Identifier", self.Pos.Counter)
+    elseif token:IsType("Number") or token:IsType("String") then
+        
+        if token:IsType("Number") then
+            return Node.new("NumberLiteral", token.Value, "Literal", self.Pos.Counter)
+        elseif token:IsType("String") then
+            return Node.new("StringLiteral", token.Value, "Literal", self.Pos.Counter)
+        end
     elseif token:Is("Operator") then
         -- Unary operator
         local unary = self:GetUnary()
         if unary then
             return unary
         end
-        error(ERR_TERM_OR_EXPR:format(token.Value, self.Pos.Counter))
         
     elseif token:Is("Symbol") then
         -- Parantheses
         if token.Value == "(" then
-            self.Head:GoNext()
             local expr = self:GetExpr()
-            if expr and self.Head:GoNext().Value == ")" then
+            if expr and self.Head:Current().Value == ")" then
+                self.Head:GoNext()
                 return expr
             end
         end
-    else
-        if token:IsType("Number") then
-            return Node.new("NumericLiteral", token.Value, "Literal", self.Pos.Counter)
-        elseif token:IsType("String") then
-            return Node.new("StringLiteral", token.Value, "Literal", self.Pos.Counter)
-        end
-        return nil
     end
+    return nil
 end
 
 function ParserUtil:GetUnary()
@@ -157,7 +164,7 @@ function ParserUtil:GetUnary()
     
     if token:Is("Operator") and ValueInTable(UNARY_OPERATORS, token.Value) then
         self.Head:GoNext()
-        local num = self:GetLiteral("Number")
+        local num = self:GetLiteral()
         if not num then
             error("Expected a number after unary operator at " .. self.Pos.Counter)
         end
@@ -187,7 +194,7 @@ function ParserUtil:GetVariable()
     end
     
     -- Get names
-    local idens = self:GetIdentifiers()
+    local idens = self:GetSeperated("Identifier", true)
     if islocal and #idens == 0 then
         error("Expected an identifier after \"local\" at " .. self.Pos.Counter)
     end
@@ -202,15 +209,27 @@ function ParserUtil:GetVariable()
     self.Head:GoNext()
     
     -- Get expr
-    local expr = self:GetLiteral()
-    if not expr then
+    local exprs = {}
+    while true do
+        if not self.Head:Current() then
+            break
+        end
+        local before = self.Pos.Counter
+        local expr = self:GetExpr()
+        if not expr then
+            self.Pos.Counter = before
+            break
+        end
+        table.insert(exprs, expr)
+    end
+    if not #exprs == 0 then
         error("Expected an expression after \"=\" at " .. self.Pos.Counter)
     end
     
     if islocal then
-        return Node.new("LocalStatement", {idens, expr}, "Variable", self.Pos.Counter)
+        return Node.new("LocalStatement", {idens, exprs}, "Variable", self.Pos.Counter)
     else
-        return Node.new("AssignmentStatement", {idens, expr}, "Variable", self.Pos.Counter)
+        return Node.new("AssignmentStatement", {idens, exprs}, "Variable", self.Pos.Counter)
     end
 end
 
@@ -219,24 +238,25 @@ end
 --#region Functions
 
 function ParserUtil:GetArguments()
-    return self:GetIdentifiers(true)
+    return self:GetExpr()
 end
 
 function ParserUtil:GetCallStatement()
     
-    local cur = self:Get(0, true)
+    local cur = self.Head:Current()
     if not (self.Head:Current() and self.Head:Current():Is("Identifier")) then
         return
+    else
+        self.Head:GoNext()
     end
     
     -- Is call
-    local start = self:Get(1, true)
-    if start:Is("Symbol") and start.Value == "(" then
-        self.Head:GoNext()
+    local start = self.Head:Current()
+    if start and start:Is("Symbol") and start.Value == "(" then
         self.Head:GoNext()
         
         local args = self:GetArguments()
-        
+        print(self:Get(-1):rep())
         if self.Head:Current().Value == ")" then
             self.Head:GoNext()
         else

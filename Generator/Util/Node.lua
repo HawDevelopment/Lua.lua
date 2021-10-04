@@ -69,7 +69,9 @@ function TableToString(tab, indent)
         end
     else
         local index, value = next(tab)
-        str = str .. " " .. index .. " = " .. ToString(value, indent) .. " "
+        if index and value then
+            str = str .. " " .. index .. " = " .. ToString(value, indent) .. " "
+        end
     end
     
     return str .. stop

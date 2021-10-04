@@ -23,17 +23,16 @@ return function(tokens, version)
         if token:Is("Keyword") and token.Value == "local" then
             nodes[#nodes + 1] = util:GetVariable()
         elseif token:Is("Identifier") then
-            local check = pos.Counter
-            while head:Next() and (head:Next():Is("Identifier") or head:Next().Value == ",") do
-                head:GoNext()
-                check = check + 1
-            end
-            if head:Next() and head:Next().Value == "=" then
+            
+            if head:Next().Value == "(" then
+                -- Call expresion?
+                
+                nodes[#nodes + 1] = util:GetCallStatement()
+            elseif head:Next().Value == "=" then
+                
                 nodes[#nodes + 1] = util:GetVariable()
-            else
-                nodes[#nodes + 1] = util:GetExpr()
             end
-        elseif token:Is("Number") then
+        else
             nodes[#nodes + 1] = util:GetExpr()
         end
     end
