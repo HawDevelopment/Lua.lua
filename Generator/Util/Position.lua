@@ -12,9 +12,7 @@ Position.__index = Position
 ---@param counter number
 function Position.new(counter)
     local self = setmetatable({}, Position)
-    
     self.Counter = counter
-    
     return self
 end
 
@@ -36,7 +34,7 @@ function Position:GetLast()
 end
 
 function Position:Last()
-    self.Counter = self.Counter - 1
+    self.Counter = math.max(self.Counter - 1, 1)
     return self.Counter
 end
 

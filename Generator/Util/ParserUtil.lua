@@ -213,7 +213,7 @@ end
 --#region Functions
 
 function ParserUtil:GetArguments()
-    return self:GetExpr()
+    return self:GetSeperated(self.GetExpr, true, self)
 end
 
 function ParserUtil:GetCallStatement()
@@ -231,13 +231,13 @@ function ParserUtil:GetCallStatement()
         self.Head:GoNext()
         
         local args = self:GetArguments()
-        if self.Head:Current().Value == ")" then
-            self.Head:GoNext()
-        else
+        
+        -- We dont go next, because the parent caller will do that
+        if not self.Head:Current().Value == ")" then
             error("Expected \")\" after arguments at " .. self.Pos.Counter)
         end
         
-        return Node.new("CallExpression", {cur, args}, "Expression", self.Pos.Counter)
+        return Node.new("CallStatement", {cur, args}, "Statement", self.Pos.Counter)
     else
         return
     end

@@ -14,11 +14,14 @@ function LexerHead.new(thing, pos)
     
     self.Thing = thing
     self.Pos = pos
-    self.GetAtPos = function(pos)
-        if type(self.Thing) == "table" then
-            return self.Thing[pos]
-        elseif type(self.Thing) == "string" then
+    
+    if type(self.Thing) == "string" then
+        self.GetAtPos = function(pos)
             return self.Thing:sub(pos, pos)
+        end
+    elseif type(self.Thing) == "table" then
+        self.GetAtPos = function(pos)
+            return self.Thing[pos]
         end
     end
     
@@ -26,27 +29,25 @@ function LexerHead.new(thing, pos)
 end
 
 function LexerHead:Next()
-    return self.GetAtPos(self.Pos:GetNext())
+    return self.GetAtPos(self.Pos.Counter + 1)
 end
 
 function LexerHead:GoNext()
-    local to_ret = self:Next()
-    self.Pos:Next()
-    return to_ret
+    return self.GetAtPos(self.Pos:Next())
 end
 
 function LexerHead:Current()
-    return self.GetAtPos(self.Pos:GetCurrent())
+    return self.GetAtPos(self.Pos.Counter)
 end
 
+-- DANGER Will not check if its negativ!!
 function LexerHead:Last()
-    return self.GetAtPos(self.Pos:GetLast())
+    return self.GetAtPos(self.Pos.Counter - 1)
 end
 
+-- DANGER Will not check if its negativ!!
 function LexerHead:GoLast()
-    local to_ret = self:Last()
-    self.Pos:Last()
-    return to_ret
+    return self.GetAtPos(self.Pos:Last())
 end
 
 return LexerHead

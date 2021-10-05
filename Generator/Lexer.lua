@@ -16,13 +16,7 @@ local function GenerateTokens(source, version)
     local head = LexerHead.new(source, pos)
     
     local function AddToken(token)
-        
-        local past = tokens[#tokens]
-        if past and past:IsType(token) and (token.Type == "String" or token.Type == "Number") then
-            past.Value = past.Value .. token.Value
-        else
-            tokens[#tokens + 1] = token
-        end
+        tokens[#tokens + 1] = token
     end
     
     local function TrimWhitespaces()
@@ -30,20 +24,21 @@ local function GenerateTokens(source, version)
             return
         end
         
-        local start, stop = pos.Counter, pos.Counter
+        local start = pos.Counter
         while true do
             local char = head:Current()
             
             if char == "\n" then
-                AddToken(Token.new("WhiteSpace", source:sub(start, stop), "WhiteSpace"))
+                --AddToken(Token.new("WhiteSpace", source:sub(start, pos.Counter), "WhiteSpace"))
+                start = pos.Counter + 1
             elseif version.INDENTATION[char] then
-                stop = stop + 1
-            else
                 break
             end
             head:GoNext()
         end
-        AddToken(Token.new("WhiteSpace", source:sub(start, stop), "WhiteSpace"))
+        if start ~= pos.Counter then
+            --AddToken(Token.new("WhiteSpace", source:sub(start, pos.Counter), "WhiteSpace"))
+        end
     end
     
     
@@ -56,35 +51,32 @@ local function GenerateTokens(source, version)
         elseif char == "\"" or char == "\'" then
             --TODO: Implement escape characters
             
-            AddToken(Token("String", char, "String"))
-            local value, last = "", nil
-            while head:GoNext() ~= "" do
-                char = head:Current()
-                if char == "\"" or char == "\'" then
-                    last = char
+            local value = ""
+            while true do
+                char = head:GoNext()
+                if char == "" or (char == "\"" or char == "\'") then
                     break
                 else
                     value = value .. char
                 end
             end
             AddToken(Token("StringLiteral", value, "String"))
-            AddToken(Token("String", last, "String"))
         
         elseif version.IDEN[char] then
             --TODO: Should this check for keywords?
             
             local value = char
-            while version.IDEN[head:Next()] do
-                head:GoNext()
-                value = value .. head:Current()
+            while true do
+                char = head:GoNext()
+                if not version.IDEN[char] then
+                    head:GoLast()
+                    break
+                end
+                value = value .. char
             end
             
-            if version.KEYWORDS[value] then
-                AddToken(Token("Keyword", value, "Keyword"))
-            else
-                AddToken(Token("Identifier", value, "Identifier"))
-            end
-        
+            local name = version.KEYWORDS[value] and "Keyword" or "Identifier"
+            AddToken(Token(name, value, name))
         elseif version.NUM[char] or (char == "." and version.NUM[head:Next()]) then
             
             ---TODO: Support for hexadecimal numbers

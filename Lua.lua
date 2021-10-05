@@ -24,6 +24,30 @@ local function PrintTokens(tokens)
     end
 end
 
+local function TakeTime(func, ...)
+    local start = os.clock()
+    local arg = { func(...) }
+    return os.clock() - start, unpack(arg)
+end
+
+local function RunFile(source)
+    print("Lexing:")
+    local lextime, tokens = TakeTime(function(...)
+        return Lexer(...)
+    end, source)
+    --PrintTokens(tokens)
+    print("Lexing took: ", lextime .. "s")
+    print("Parsing:")
+    local parsetime, parsed = TakeTime(function(...)
+        return Parser(...)
+    end, tokens)
+    -- PrintTokens(parsed)
+    print("Parsing took: ", parsetime .. "s")
+    -- print("Interpreting:")
+    -- Interpreter(parsed)
+    print("Total time: ", (parsetime + lextime) * 100 .. "ms")
+end
+
 if DO_CLI then
     if #arg == 0 then
         print(USAGE)
@@ -39,15 +63,7 @@ if DO_CLI then
         
         local source = file:read("*a")
         file:close()
-        
-        print("Lexing:")
-        local tokens = Lexer(source)
-        PrintTokens(tokens)
-        print("Parsing:")
-        local parsed = Parser(tokens)
-        PrintTokens(parsed)
-        -- print("Interpreting:")
-        -- Interpreter(parsed)
+        RunFile(source)
         
     elseif command == "sim" then
         
@@ -58,14 +74,7 @@ if DO_CLI then
                 return
             end
             
-            print("Lexing:")
-            local tokens = Lexer(inp)
-            PrintTokens(tokens)
-            print("Parsing:")
-            local parsed = Parser(tokens)
-            PrintTokens(parsed)
-            -- print("Interpreting:")
-            -- Interpreter(parsed)
+            RunFile(inp)
         end
     end
 end
