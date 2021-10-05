@@ -20,20 +20,13 @@ local function GenerateTokens(source, version)
             return
         end
         
-        local start = pos.Counter
         while true do
-            local char = head:Current()
-            
-            if char == "\n" then
-                --AddToken(Token.new("WhiteSpace", source:sub(start, pos.Counter), "WhiteSpace"))
-                start = pos.Counter + 1
-            elseif version.INDENTATION[char] then
+            char = head:GoNext()
+            if not char then
+                break
+            elseif not version.INDENTATION[char] and char ~= "\n" then
                 break
             end
-            head:GoNext()
-        end
-        if start ~= pos.Counter then
-            --AddToken(Token.new("WhiteSpace", source:sub(start, pos.Counter), "WhiteSpace"))
         end
     end
     
@@ -58,14 +51,9 @@ local function GenerateTokens(source, version)
         elseif version.IDEN[char] then
             --TODO: Should this check for keywords?
             
-            value = char
-            while true do
-                char = head:GoNext()
-                if not version.IDEN[char] then
-                    head:GoLast()
-                    break
-                end
-                value = value .. char
+            value = string.match(source, "[%a%d_]+", pos.Counter)
+            if not value then
+                error("Invalid identifier")
             end
             
             if version.KEYWORDS[value] then
@@ -73,6 +61,7 @@ local function GenerateTokens(source, version)
             else
                 tokens[#tokens + 1] = Token("Identifier", value, "Identifier")
             end
+            pos.Counter = pos.Counter + #value - 1
             
         elseif version.NUM[char] or (char == "." and version.NUM[head:Next()]) then
             
