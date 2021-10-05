@@ -4,50 +4,53 @@
     28/09/2021
 --]]
 
+local function ToTable(str)
+    local tab = {}
+    for i = 1, #str do
+        tab[#tab+1] = str:sub(i, i)
+    end
+    return tab
+end
+
+
 local LexerHead = {}
 LexerHead.__index = LexerHead
 
----@param thing any
+---@param tab string | table
 ---@param pos Position
-function LexerHead.new(thing, pos)
-    local self = setmetatable({}, LexerHead)
+function LexerHead.new(tab, pos)
+    local self = setmetatable({
+        Thing = tab,
+        Pos = pos
+    }, LexerHead)
     
-    self.Thing = thing
-    self.Pos = pos
-    
-    if type(self.Thing) == "string" then
-        self.GetAtPos = function(pos)
-            return self.Thing:sub(pos, pos)
-        end
-    elseif type(self.Thing) == "table" then
-        self.GetAtPos = function(pos)
-            return self.Thing[pos]
-        end
+    if type(tab) == "string" then
+        self.Thing = ToTable(tab)
     end
     
     return self
 end
 
 function LexerHead:Next()
-    return self.GetAtPos(self.Pos.Counter + 1)
+    return self.Thing[self.Pos.Counter + 1]
 end
 
 function LexerHead:GoNext()
-    return self.GetAtPos(self.Pos:Next())
+    return self.Thing[self.Pos:Next()]
 end
 
 function LexerHead:Current()
-    return self.GetAtPos(self.Pos.Counter)
+    return self.Thing[self.Pos.Counter]
 end
 
 -- DANGER Will not check if its negativ!!
 function LexerHead:Last()
-    return self.GetAtPos(self.Pos.Counter - 1)
+    return self.Thing[self.Pos.Counter - 1]
 end
 
 -- DANGER Will not check if its negativ!!
 function LexerHead:GoLast()
-    return self.GetAtPos(self.Pos:Last())
+    return self.Thing[self.Pos:Last()]
 end
 
 return LexerHead

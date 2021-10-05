@@ -24,28 +24,37 @@ local function PrintTokens(tokens)
     end
 end
 
+local function ValueInTable(tab, value)
+    for _, val in pairs(tab) do
+        if val == value then
+            return true
+        end
+    end
+    return false
+end
+
 local function TakeTime(func, ...)
     local start = os.clock()
     local arg = { func(...) }
     return os.clock() - start, unpack(arg)
 end
 
-local function RunFile(source)
+local function RunFile(source, lexer, parser, interpreter)
     print("Lexing:")
     local lextime, tokens = TakeTime(function(...)
-        return Lexer(...)
+        return lexer(...)
     end, source)
     --PrintTokens(tokens)
     print("Lexing took: ", lextime .. "s")
     print("Parsing:")
     local parsetime, parsed = TakeTime(function(...)
-        return Parser(...)
+        return parser(...)
     end, tokens)
     -- PrintTokens(parsed)
     print("Parsing took: ", parsetime .. "s")
     -- print("Interpreting:")
-    -- Interpreter(parsed)
-    print("Total time: ", (parsetime + lextime) * 100 .. "ms")
+    -- interpreter(parsed)
+    print("Total time: ", (parsetime + lextime) .. "s")
 end
 
 if DO_CLI then
@@ -54,18 +63,31 @@ if DO_CLI then
         return
     end
     
-    local command = arg[1]
-    if command == "run" then
-        local file = io.open(arg[2], "r")
+    -- Parse the command
+    local opt, args = {}, {}
+    for _, value in pairs(arg) do
+        if string.match(value, "^%-%-") ~= nil then
+            opt[#opt+1] = value:sub(3)
+        else
+            args[#args+1] = value
+        end
+    end
+    
+    local dodebug = ValueInTable(opt, "debug")
+    local lexer = dodebug and require("Generator.LexerDebug") or Lexer
+    local parser = Parser
+    
+    if args[1] == "run" then
+        local file = io.open(args[2], "r")
         if not file then
             return print("File not found")
         end
         
         local source = file:read("*a")
         file:close()
-        RunFile(source)
+        RunFile(source, lexer, parser)
         
-    elseif command == "sim" then
+    elseif args[1] == "sim" then
         
         while true do
             io.write("> ")
@@ -74,7 +96,7 @@ if DO_CLI then
                 return
             end
             
-            RunFile(inp)
+            RunFile(inp, lexer, parser)
         end
     end
 end

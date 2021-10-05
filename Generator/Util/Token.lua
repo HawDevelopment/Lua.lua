@@ -15,12 +15,12 @@ Token.__index = Token
 ---@param pos Position
 ---@return Token
 function Token.new(name, value, type, pos)
-    local self = setmetatable({}, Token)
-    
-    self.Name = name
-    self.Value = value
-    self.Type = type
-    self.Pos = pos
+    local self = setmetatable({
+        Name = name,
+        Value = value,
+        Type = type,
+        Pos = pos
+    }, Token)
     
     return self
 end

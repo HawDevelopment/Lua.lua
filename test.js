@@ -11,7 +11,7 @@ fs.readFile(filepath, {encoding: "utf-8"}, (err, data) => {
 	}
 
 	console.log(data.length);
-	const time = Date.now();
-	var ast = parser.parse(data);
-	console.log("Time: ", Date.now() - time + "ms");
+	const parsetime = Date.now();
+	parser.parse(data);
+	console.log("Total time: ", (Date.now() - parsetime) / 1000 + "s");
 });
