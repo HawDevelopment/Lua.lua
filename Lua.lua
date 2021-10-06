@@ -55,6 +55,7 @@ local function RunFile(source, lexer, parser, interpreter)
     -- print("Interpreting:")
     -- interpreter(parsed)
     print("Total time: ", (parsetime + lextime) .. "s")
+    return parsed
 end
 
 if DO_CLI then
@@ -85,7 +86,10 @@ if DO_CLI then
         
         local source = file:read("*a")
         file:close()
-        RunFile(source, lexer, parser)
+        local parsed = RunFile(source, lexer, parser)
+        if ValueInTable(opt, "print") then
+            PrintTokens(parsed)
+        end
         
     elseif args[1] == "sim" then
         
@@ -96,7 +100,10 @@ if DO_CLI then
                 return
             end
             
-            RunFile(inp, lexer, parser)
+            local parsed = RunFile(inp, lexer, parser)
+            if ValueInTable(opt, "print") then
+                PrintTokens(parsed)
+            end
         end
     end
 end
