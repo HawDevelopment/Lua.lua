@@ -7,6 +7,14 @@
 local TakeTime = {}
 TakeTime.__index = TakeTime
 
+local INDENT = true
+
+local INDENTS = {
+    NAME = 16,
+    TIME = 6,
+    CALLS = 12,
+    AVG = 13,
+}
 
 function TakeTime.new()
     local self = setmetatable({
@@ -41,10 +49,22 @@ function TakeTime:Add(name, time)
     self.Nodes[name].Time = self.Nodes[name].Time + time
 end
 
+local function Round(num, div)
+    return tostring(num * div):sub(1, -12)
+end
+
 function TakeTime:rep()
     local out = ""
     for name, node in pairs(self.Nodes) do
-        out = out .. name:upper() .. " = " .. node.Time .. "s" .. " " .. node.Calls .. " calls" .. "\n"
+        local time, calls, avg = tostring(node.Time) .. "s", tostring(node.Calls) .. " calls", Round(node.Time / node.Calls, 1000000) .. "us avrg"
+        if INDENT then
+            name = name .. string.rep(" ", math.max(INDENTS.NAME - #name, 0))
+            time = time .. string.rep(" ", math.max(INDENTS.TIME - #time, 0))
+            calls = calls .. string.rep(" ", math.max(INDENTS.CALLS - #calls, 0))
+            avg = avg .. string.rep(" ", math.max(INDENTS.AVG - #avg, 0))
+            
+        end
+        out = out .. string.format("%s = %s %s %s\n", name, time, calls, avg)
     end
     return out
 end
