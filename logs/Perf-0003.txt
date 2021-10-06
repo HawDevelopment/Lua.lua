@@ -1,0 +1,17 @@
+(10/06/2021)
+Lexing:
+Real Lexer Time: 0.071
+Identifier       = 0.01s  4700 calls   2.127us avrg
+GetNext          = 0.006s 18999 calls  0.315us avrg
+Whitespace       = 0.005s 18999 calls  0.263us avrg
+Symbol           = 0.015s 9400 calls   1.595us avrg
+
+Lexing took:    0.083s
+Parsing:
+Real Parser Time: 0.027
+PerfArguments    = 0s     4700 calls   0us avrg
+CallArguments    = 0.006s 4700 calls   1.276us avrg
+GetCallStatement = 0.016s 4700 calls   3.404us avrg
+
+Parsing took:   0.029s
+Total time:     0.112s

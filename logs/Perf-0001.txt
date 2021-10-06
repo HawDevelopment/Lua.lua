@@ -1,0 +1,24 @@
+(10/06/2021)
+Lexing:
+Real Lexer Time: 0.081
+GetNext          = 0.004s 23699 calls  0.168us avrg 
+Symbol           = 0.011s 9400 calls   1.170us avrg 
+String           = 0.008s 4700 calls   1.702us avrg 
+Whitespace       = 0.013s 23699 calls  0.548us avrg 
+Identifier       = 0.008s 4700 calls   1.702us avrg 
+
+Lexing took:    0.102s
+Parsing:
+Real Parser Time:       0.092
+GetArguments     = 0.002s 4700 calls   0.425us avrg 
+GetCallStatement = 0.075s 4700 calls   15.957us avrg
+GetTerm          = 0.038s 4700 calls   8.085us avrg 
+GetSeperated     = 0.058s 4700 calls   12.340us avrg
+GetFactor        = 0.029s 4700 calls   6.170us avrg 
+GetBinOp         = 0.107s 14100 calls  7.588us avrg 
+GetPower         = 0.027s 4700 calls   5.744us avrg 
+GetLiteral       = 0.004s 4700 calls   0.851us avrg
+GetExpr          = 0.053s 4700 calls   11.276us avrg
+
+Parsing took:   0.095s
+Total time:     0.197s
