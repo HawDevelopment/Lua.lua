@@ -25,6 +25,12 @@ local function Stop(name)
     end
 end
 
+local function Add(name, time)
+    if TAKETIME then
+        timer:Add(name, time)
+    end
+end
+
 
 ---@param source string
 ---@param version table<string, table<string | number, Token | BaseError>>
@@ -64,19 +70,19 @@ local function GenerateTokens(source, version)
             --TODO: Implement escape characters
             --TODO: Implement multi line strings
             
-            Start()
+            local strstarttime = os.clock()
             value = string.match(source, char .. ".-" .. char, pos.Counter)
             if not value then
                 error("Unterminated string literal")
             end
             tokens[#tokens + 1] = Token.new("String", value, "String")
             pos.Counter = pos.Counter + #value - 1
-            Stop("String")
+            Add("String", os.clock() - strstarttime)
             
         elseif version.IDEN[char] then
             --TODO: Should this check for keywords?
             
-            Start()
+            local idenstarttime = os.clock()
             value = string.match(source, "[%a%d_]+", pos.Counter)
             if not value then
                 error("Invalid identifier")
@@ -88,12 +94,12 @@ local function GenerateTokens(source, version)
                 tokens[#tokens + 1] = Token("Identifier", value, "Identifier")
             end
             pos.Counter = pos.Counter + #value - 1
-            Stop("Identifier")
+            Add("Identifier", os.clock() - idenstarttime)
             
         elseif version.NUM[char] or (char == "." and version.NUM[head:Next()]) then
             
             ---TODO: Support for hexadecimal numbers
-            Start()
+            local numstarttime = os.clock()
             value = char
             while version.NUM[head:Next()] do
                 value = value .. head:GoNext()
@@ -116,21 +122,24 @@ local function GenerateTokens(source, version)
             end
             
             tokens[#tokens + 1] = Token("NumberLiteral", value, "Number")
-            Stop("Number")
+            Add("Number", os.clock() - numstarttime)
+            
+            -- DANGER Operators MUST be checked before symbols
+        elseif version.OPERATORS[char] then
+            
+            local opstarttime = os.clock()
+            Token("Operator", char, "Operator")
+            timer:Add("Operator", os.clock() - opstarttime)
             
         elseif version.SYMBOLS[char] then
             
-            Start()
-            if version.OPERATORS[char] then
-                tokens[#tokens + 1] = Token("Operator", char, "Operator")
-            else
-                tokens[#tokens + 1] = Token("Symbol", char, "Symbol")
-            end
-            Stop("Symbol")
+            local symstarttime = os.clock()
+            tokens[#tokens + 1] = Token("Symbol", char, "Symbol")
+            timer:Add("Symbol", os.clock() - symstarttime)
             
         elseif char == "." then
             
-            Start()
+            local dotstarttime = os.clock()
             value = char
             if head:Next() == "." then
                 value = value .. head:GoNext()
@@ -139,16 +148,16 @@ local function GenerateTokens(source, version)
                 end
             end
             tokens[#tokens + 1] = Token("Symbol", value, "Symbol")
-            Stop("Dot")
+            Add("Dot", os.clock() - dotstarttime)
             
         elseif version.EQUALITY[char] then
             
-            Start()
+            local equalstarttime = os.clock()
             if version.EQUALITY[head:Next()] then
                 char = char .. head:GoNext()
             end
             tokens[#tokens + 1] = Token("Symbol", char, "Symbol")
-            Stop("Equality")
+            Add("Equality", os.clock() - equalstarttime)
         end
     end
     
