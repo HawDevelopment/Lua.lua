@@ -65,26 +65,30 @@ function ParserUtil:GetSeperated(tofind, comma, ...)
     if comma == nil then
         comma = true
     end
+    local idens, cur = {}, nil
     
-    local idens = {}
     while true do
-        local cur = self.Head:Current()
+        local callstarttime = os.clock()
         
-        if type(tofind) == "table" then
-            if not ValueInTable(tofind, cur.Name) or ValueInTable(tofind, cur.Type) then
+        cur = self.Head:Current()
+        if type(tofind) == "string" then
+            if not (cur.Name == tofind) then
                 break
             end
-        elseif type(tofind) == "string" then
-            if not (cur.Name == tofind or cur.Type == tofind) then
-                break
-            end
-            self.Head:GoNext()
         elseif type(tofind) == "function" then
             cur = tofind(...)
+        elseif type(tofind) == "table" then
+            if not ValueInTable(tofind, cur.Name) then
+                break
+            end
+        end
+        if TAKETIME then
+            self.TakeTime:Add("SeperateCall", os.clock() - callstarttime)
         end
         
         table.insert(idens, cur)
-        if comma and self.Head:Current() and self.Head:Current().Value == "," then
+        cur = self.Head:Next()
+        if comma and cur and cur.Value == "," then
             self.Head:GoNext()
         else
             break
@@ -267,7 +271,7 @@ function ParserUtil:GetVariable()
     -- Get expr
     local init
     if self.Head:Current() and self.Head:Current().Value == "=" then
-        init = self:GetSeperated(self.GetLiteral, true, self)
+        init = self:GetSeperated(self.GetExpr, true, self)
         if #init == 0 then
             self:Stop("GetVariable")
             error("Expected an expression after \"=\" at " .. self.Pos.Counter)
@@ -283,26 +287,42 @@ end
 --#region Functions
 
 function ParserUtil:GetArguments()
-    self:Start()
-    self:Stop("GetArguments")
     return self:GetSeperated(self.GetExpr, true, self)
 end
 
 function ParserUtil:GetCallStatement()
     local starttime = os.clock()
     local cur = self.Head:Current()
-    if not (self.Head:Current() and self.Head:Current():Is("Identifier")) then
+    if not (cur and cur:Is("Identifier")) then
         return
     else
-        self.Head:GoNext()
+        cur = self.Head:GoNext()
     end
     
     -- Is call
-    local start = self.Head:Current()
-    if start and start:Is("Symbol") and start.Value == "(" then
+    if cur and cur:Is("Symbol") and cur.Value == "(" then
         self.Head:GoNext()
+        local args
+        local callstarttime = os.clock()
         
-        local args = self:GetArguments()
+        -- Could save performance by not calling GetArguments if there are no arguments or if theres only one
+        local next, nextnext = self.Head:Current(), self.Head:Next()
+        if (next and next.Value == ")") or (nextnext and nextnext.Value == ")") then
+            local perfstarttime = os.clock()
+            if next.Value == ")" then
+                args = {}
+            else
+                args = { self:GetExpr() }
+            end
+            if TAKETIME then
+                self.TakeTime:Add("PerfArguments", os.clock() - perfstarttime)
+            end
+        else
+            args = self:GetArguments()
+        end
+        if TAKETIME then
+            self.TakeTime:Add("CallArguments", os.clock() - callstarttime)
+        end
         
         -- We dont go next, because the parent caller will do that
         if not self.Head:Current().Value == ")" then
