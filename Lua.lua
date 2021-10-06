@@ -74,8 +74,8 @@ if DO_CLI then
     end
     
     local dodebug = ValueInTable(opt, "debug")
-    local lexer = dodebug and require("Generator.LexerDebug") or Lexer
-    local parser = Parser
+    local lexer = dodebug and require("Generator.Debug.LexerDebug") or Lexer
+    local parser = dodebug and require("Generator.Debug.ParserDebug") or Parser
     
     if args[1] == "run" then
         local file = io.open(args[2], "r")
