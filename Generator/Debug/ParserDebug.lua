@@ -11,6 +11,7 @@ local ParserUtil = require("Generator.Debug.ParserUtilDebug")
 
 return function(tokens, version)
     version = require("Versions.Lua51")
+    local starttime = os.clock()
     
     local nodes = {}
     local pos = Position(0)
@@ -37,6 +38,7 @@ return function(tokens, version)
         end
     end
     
+    print("Real Parser Time: ", os.clock() - starttime)
     print(util.TakeTime:rep())
     
     return nodes

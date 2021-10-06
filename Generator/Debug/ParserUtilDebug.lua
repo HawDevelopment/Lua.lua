@@ -61,7 +61,7 @@ function IsUnaryToken(token)
 end
 
 function ParserUtil:GetSeperated(tofind, comma, ...)
-    self:Start()
+    local starttime = os.clock()
     if comma == nil then
         comma = true
     end
@@ -91,7 +91,9 @@ function ParserUtil:GetSeperated(tofind, comma, ...)
         end
     end
     
-    self:Stop("GetSeperated")
+    if TAKETIME then
+        self.TakeTime:Add("GetSeperated", os.clock() - starttime)
+    end
     return idens
 end
 
@@ -100,7 +102,7 @@ end
 --#region Getting tokens
 
 function ParserUtil:GetBinOp(operators, func, ...)
-    self:Start()
+    local starttime = os.clock()
     local left = func(...)
     while self.Head:Current() and self.Head:Current():Is("Operator") and ValueInTable(operators, self.Head:Current().Value) do
         local op = self.Head:Current()
@@ -108,12 +110,17 @@ function ParserUtil:GetBinOp(operators, func, ...)
         
         local right = func(...)
         if not right then
-            self:Stop("GetBinOp")
+            if TAKETIME then
+                self.TakeTime:Add("GetBinOp", os.clock() - starttime) 
+            end
             error("Unexpected token: Expected a term or expression after operator at " .. self.Pos.Counter)
         end
         left = Node.new("BinaryExpression", {op, left, right}, "Expression", self.Pos.Counter)
     end
-    self:Stop("GetBinOp")
+    
+    if TAKETIME then
+        self.TakeTime:Add("GetBinOp", os.clock() - starttime) 
+    end
     return left
 end
 
@@ -178,37 +185,52 @@ do
     end
     
     function ParserUtil:GetPower()
-        self:Start()
-        self:Stop("GetPower")
-        return self:GetBinOp({"^"}, self.GetLiteral, self)
+        local starttime = os.clock()
+        local ret = self:GetBinOp({"^"}, self.GetLiteral, self)
+        
+        if TAKETIME then
+            self.TakeTime:Add("GetPower", os.clock() - starttime)
+        end
+        return ret
     end
     
     function ParserUtil:GetFactor()
-        self:Start()
+        local starttime = os.clock()
         local cur = self.Head:Current()
         if not cur then
             self:Stop("GetFactor")
             return nil
         end
         
+        local ret
         if IsUnaryToken(cur) then
-            self:Stop("GetFactor")
-            return self:GetUnary()
+            ret = self:GetUnary()
+        else
+            ret = self:GetPower()
         end
-        self:Stop("GetFactor")
-        return self:GetPower()
+        
+        if TAKETIME then
+            self.TakeTime:Add("GetFactor", os.clock() - starttime)
+        end
+        return ret
     end
     
     function ParserUtil:GetTerm()
-        self:Start()
-        self:Stop("GetTerm")
-        return self:GetBinOp(TERM_OPERATORS, self.GetFactor, self)
+        local starttime = os.clock()
+        local ret = self:GetBinOp(TERM_OPERATORS, self.GetFactor, self)
+        if TAKETIME then
+            self.TakeTime:Add("GetTerm", os.clock() - starttime)
+        end
+        return ret
     end
     
     function ParserUtil:GetExpr()
-        self:Start()
-        self:Stop("GetExpr")
-        return self:GetBinOp(EXPR_OPERATORS, self.GetTerm, self)
+        local starttime = os.clock()
+        local ret = self:GetBinOp(EXPR_OPERATORS, self.GetTerm, self)
+        if TAKETIME then
+            self.TakeTime:Add("GetExpr", os.clock() - starttime)
+        end
+        return ret
     end
 end
 
@@ -267,7 +289,7 @@ function ParserUtil:GetArguments()
 end
 
 function ParserUtil:GetCallStatement()
-    self:Start()
+    local starttime = os.clock()
     local cur = self.Head:Current()
     if not (self.Head:Current() and self.Head:Current():Is("Identifier")) then
         return
@@ -284,14 +306,21 @@ function ParserUtil:GetCallStatement()
         
         -- We dont go next, because the parent caller will do that
         if not self.Head:Current().Value == ")" then
-            self:Stop("GetCallStatement")
+            if TAKETIME then
+                self.TakeTime:Add("GetCallStatement", os.clock() - starttime)
+            end
             error("Expected \")\" after arguments at " .. self.Pos.Counter)
         end
         
-        self:Stop("GetCallStatement")
+        if TAKETIME then
+            self.TakeTime:Add("GetCallStatement", os.clock() - starttime)
+        end
         return Node.new("CallStatement", {cur, args}, "Statement", self.Pos.Counter)
     end
-    self:Stop("GetCallStatement")
+    
+    if TAKETIME then
+        self.TakeTime:Add("GetCallStatement", os.clock() - starttime)
+    end
     return
 end
 
