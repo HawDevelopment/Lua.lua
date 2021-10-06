@@ -10,6 +10,10 @@ function execute(command, callback) {
 }
 
 execute("lua Lua.lua --debug run test.lua", (message) => {
+	if (!fs.existsSync(perf_dir)) {
+		fs.mkdirSync(perf_dir);
+	}
+
 	fs.readdir(perf_dir, (_, files) => {
 		var date = new Date();
 		date = date.getMonth() + 1 + "/" + (date.getDate() > 9 ? "" : "0") + date.getDate() + "/" + date.getFullYear();
@@ -22,6 +26,7 @@ execute("lua Lua.lua --debug run test.lua", (message) => {
 		var file = perf_dir + "/Perf-" + name + ".txt";
 		fs.writeFile(file, message, (err) => {
 			if (err) throw err;
+			console.log("Saved to " + file);
 		});
 	});
 });
