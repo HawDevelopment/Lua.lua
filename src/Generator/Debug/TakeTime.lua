@@ -51,7 +51,7 @@ end
 
 local function Round(num, div)
     local match = tostring(num * div):match("(%d-%.%d%d%d)%d*")
-    return match
+    return match or "0.000"
 end
 
 function TakeTime:rep()

@@ -1,4 +1,5 @@
 const exec = require("child_process").exec;
+const execFile = require("child_process").execFile;
 const fs = require("fs");
 const os = require("os");
 
@@ -14,6 +15,9 @@ const build_dir = "./bin/" + OS_TO_NAME[os.platform()];
 
 function execute(command, callback) {
 	exec(command, function (err, stdout, stderr) {
+		if (stderr) {
+			console.log(stderr);
+		}
 		callback(stdout);
 	});
 }
@@ -40,14 +44,20 @@ function handle_perf(message) {
 	});
 }
 
-execute("lua src/main.lua --debug run test.lua", (message) => {
-	console.log(message);
+execute("lua Lua.lua --debug run test.lua", (message) => {
 	handle_perf(message);
 });
 
 if (fs.existsSync(build_dir)) {
-	execute(build_dir + "/Lua.exe --debug run test.lua", (message) => {
-		message = message + "\n(THIS WAS A BUILD VERSION)";
-		handle_perf(message);
+	execFile(build_dir + "/Lua.exe", ["--debug", "run", "test.lua"], {cwd: __dirname}, (err, stdout, stderr) => {
+		if (err) {
+			console.error(err);
+		}
+		if (stderr) {
+			console.error(stderr);
+		}
+
+		stdout = "(THIS WAS A BUILD VERSION)\n" + stdout;
+		handle_perf(stdout);
 	});
 }
