@@ -1,0 +1,6 @@
+[submodule "vendor/luamake"]
+	path = vendor/luamake
+	url = https://github.com/actboy168/luamake
+[submodule "vendor/bee.lua"]
+	path = vendor/bee.lua
+	url = https://github.com/actboy168/bee.lua
