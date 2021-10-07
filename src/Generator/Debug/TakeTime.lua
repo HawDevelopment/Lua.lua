@@ -50,7 +50,8 @@ function TakeTime:Add(name, time)
 end
 
 local function Round(num, div)
-    return tostring(num * div):gsub("%.(%d%d%d)%d*", "%.%1")
+    local match = tostring(num * div):match("(%d-%.%d%d%d)%d*")
+    return match
 end
 
 function TakeTime:rep()

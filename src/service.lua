@@ -1,5 +1,5 @@
 --[[
-    Main
+    Service file
     HawDevelopment
     28/09/2021
 --]]
@@ -14,9 +14,11 @@ local USAGE = [[
         sim     Takes input and interprets it immediately
 ]]
 
-local Lexer = require("Generator.Lexer")
-local Interpreter = require("Generator.Interpreter")
-local Parser = require("Generator.Parser")
+local Lexer = require("src.Generator.Lexer")
+local Interpreter = require("src.Generator.Interpreter")
+local Parser = require("src.Generator.Parser")
+
+local unpack = unpack or table.unpack
 
 local function PrintTokens(tokens)
     for _, tok in pairs(tokens) do
@@ -58,7 +60,7 @@ local function RunFile(source, lexer, parser, interpreter)
     return parsed
 end
 
-if DO_CLI then
+return DO_CLI and function(arg)
     if #arg == 0 then
         print(USAGE)
         return
@@ -75,8 +77,8 @@ if DO_CLI then
     end
     
     local dodebug = ValueInTable(opt, "debug")
-    local lexer = dodebug and require("Generator.Debug.LexerDebug") or Lexer
-    local parser = dodebug and require("Generator.Debug.ParserDebug") or Parser
+    local lexer = dodebug and require("src.Generator.Debug.LexerDebug") or Lexer
+    local parser = dodebug and require("src.Generator.Debug.ParserDebug") or Parser
     
     if args[1] == "run" then
         local file = io.open(args[2], "r")
@@ -106,4 +108,6 @@ if DO_CLI then
             end
         end
     end
+end or function ()
+    print("Not running CLI mode!")
 end

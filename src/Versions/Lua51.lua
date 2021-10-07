@@ -4,8 +4,8 @@
     28/09/2021
 --]]
 
-local Token = require("Generator.Util.Token")
-local ToTable = require("Versions.Util.ToTable")
+local Token = require("src.Generator.Util.Token")
+local ToTable = require("src.Versions.Util.ToTable")
 
 local INDENTATION = ToTable("   ")
 local IDEN = ToTable("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_")

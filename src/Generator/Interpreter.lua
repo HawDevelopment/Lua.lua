@@ -4,11 +4,13 @@
     29/09/2021
 --]]
 
-local LexerHead = require("Generator.Util.LexerHead")
-local Position = require("Generator.Util.Position")
-local Token = require("Generator.Util.Token")
-local Node = require("Generator.Util.Node")
-local Type = require("Generator.Util.Type")
+local LexerHead = require("src.Generator.Util.LexerHead")
+local Position = require("src.Generator.Util.Position")
+local Token = require("src.Generator.Util.Token")
+local Node = require("src.Generator.Util.Node")
+local Type = require("src.Generator.Util.Type")
+
+local unpack = unpack or table.unpack
 
 function EvalBinOp(op, a, b)
     a, b = tonumber(a), tonumber(b)

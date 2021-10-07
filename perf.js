@@ -1,7 +1,16 @@
 const exec = require("child_process").exec;
 const fs = require("fs");
+const os = require("os");
 
 const perf_dir = "./logs";
+
+const OS_TO_NAME = {
+	darwin: "macOS",
+	win32: "Windows",
+	linux: "Linux",
+};
+
+const build_dir = "./bin/" + OS_TO_NAME[os.platform()];
 
 function execute(command, callback) {
 	exec(command, function (err, stdout, stderr) {
@@ -9,7 +18,7 @@ function execute(command, callback) {
 	});
 }
 
-execute("lua Lua.lua --debug run test.lua", (message) => {
+function handle_perf(message) {
 	if (!fs.existsSync(perf_dir)) {
 		fs.mkdirSync(perf_dir);
 	}
@@ -29,4 +38,16 @@ execute("lua Lua.lua --debug run test.lua", (message) => {
 			console.log("Saved to " + file);
 		});
 	});
+}
+
+execute("lua src/main.lua --debug run test.lua", (message) => {
+	console.log(message);
+	handle_perf(message);
 });
+
+if (fs.existsSync(build_dir)) {
+	execute(build_dir + "/Lua.exe --debug run test.lua", (message) => {
+		message = message + "\n(THIS WAS A BUILD VERSION)";
+		handle_perf(message);
+	});
+}

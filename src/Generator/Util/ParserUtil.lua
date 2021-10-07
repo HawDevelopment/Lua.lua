@@ -4,11 +4,7 @@
     02/10/2021
 --]]
 
-local Node = require("Generator.Util.Node")
-local TakeTime = require("Generator.Debug.TakeTime")
-
-local TAKETIME = true
-
+local Node = require("src.Generator.Util.Node")
 
 local ParserUtil = {}
 ParserUtil.__index = ParserUtil
@@ -37,21 +33,7 @@ function ParserUtil.new(tokens, head)
     self.Head = head
     self.Pos = head.Pos
     
-    self.TakeTime = TakeTime.new()
-    
     return self
-end
-
-function ParserUtil:Start()
-    if TAKETIME then
-        self.TakeTime:Start()
-    end
-end
-
-function ParserUtil:Stop(name)
-    if TAKETIME then
-        self.TakeTime:Stop(name)
-    end
 end
 
 --#region Util
@@ -61,15 +43,13 @@ function IsUnaryToken(token)
 end
 
 function ParserUtil:GetSeperated(tofind, comma, ...)
-    local starttime = os.clock()
     if comma == nil then
         comma = true
     end
+    
     local idens, cur = {}, nil
     
     while true do
-        local callstarttime = os.clock()
-        
         cur = self.Head:Current()
         if type(tofind) == "string" then
             if not (cur.Name == tofind) then
@@ -82,9 +62,6 @@ function ParserUtil:GetSeperated(tofind, comma, ...)
                 break
             end
         end
-        if TAKETIME then
-            self.TakeTime:Add("SeperateCall", os.clock() - callstarttime)
-        end
         
         table.insert(idens, cur)
         cur = self.Head:Next()
@@ -95,9 +72,6 @@ function ParserUtil:GetSeperated(tofind, comma, ...)
         end
     end
     
-    if TAKETIME then
-        self.TakeTime:Add("GetSeperated", os.clock() - starttime)
-    end
     return idens
 end
 
@@ -106,7 +80,6 @@ end
 --#region Getting tokens
 
 function ParserUtil:GetBinOp(operators, func, ...)
-    local starttime = os.clock()
     local left = func(...)
     while self.Head:Current() and self.Head:Current():Is("Operator") and ValueInTable(operators, self.Head:Current().Value) do
         local op = self.Head:Current()
@@ -114,34 +87,25 @@ function ParserUtil:GetBinOp(operators, func, ...)
         
         local right = func(...)
         if not right then
-            if TAKETIME then
-                self.TakeTime:Add("GetBinOp", os.clock() - starttime) 
-            end
             error("Unexpected token: Expected a term or expression after operator at " .. self.Pos.Counter)
         end
         left = Node.new("BinaryExpression", {op, left, right}, "Expression", self.Pos.Counter)
-    end
-    
-    if TAKETIME then
-        self.TakeTime:Add("GetBinOp", os.clock() - starttime) 
     end
     return left
 end
 
 function ParserUtil:GetLiteral()
-    self:Start()
     local token = self.Head:Current()
     if not token then
-        self:Stop("GetLiteral")
         return nil
     end
     self.Head:GoNext()
     
     if token:Is("Identifier") then
-        self:Stop("GetLiteral")
+        
         return Node.new("Identifier", token.Value, "Identifier", self.Pos.Counter)
     elseif token:IsType("Number") or token:IsType("String") then
-        self:Stop("GetLiteral")
+        
         if token:IsType("Number") then
             return Node.new("NumberLiteral", token.Value, "Literal", self.Pos.Counter)
         elseif token:IsType("String") then
@@ -154,23 +118,19 @@ function ParserUtil:GetLiteral()
             local expr = self:GetExpr()
             if expr and self.Head:Current().Value == ")" then
                 self.Head:GoNext()
-                self:Stop("GetLiteral")
                 return expr
             end
         end
     end
     self.Head:GoLast()
-    self:Stop("GetLiteral")
     return nil
 end
 
 -- Math
 do
     function ParserUtil:GetUnary()
-        self:Start()
         local token = self.Head:Current()
         if not token then
-            self:Stop("GetUnary")
             return nil
         end
         
@@ -178,70 +138,41 @@ do
             self.Head:GoNext()
             local num = self:GetLiteral()
             if not num then
-                self:Stop("GetUnary")
                 error("Expected a number after unary operator at " .. self.Pos.Counter)
             end
-            self:Stop("GetUnary")
             return Node.new("Unary", {token, num}, "Unary", self.Pos.Counter)
         end
-        self:Stop("GetUnary")
         return nil 
     end
     
     function ParserUtil:GetPower()
-        local starttime = os.clock()
-        local ret = self:GetBinOp({"^"}, self.GetLiteral, self)
-        
-        if TAKETIME then
-            self.TakeTime:Add("GetPower", os.clock() - starttime)
-        end
-        return ret
+        return self:GetBinOp({"^"}, self.GetLiteral, self)
     end
     
     function ParserUtil:GetFactor()
-        local starttime = os.clock()
         local cur = self.Head:Current()
         if not cur then
-            self:Stop("GetFactor")
             return nil
         end
         
-        local ret
         if IsUnaryToken(cur) then
-            ret = self:GetUnary()
-        else
-            ret = self:GetPower()
+            return self:GetUnary()
         end
-        
-        if TAKETIME then
-            self.TakeTime:Add("GetFactor", os.clock() - starttime)
-        end
-        return ret
+        return self:GetPower()
     end
     
     function ParserUtil:GetTerm()
-        local starttime = os.clock()
-        local ret = self:GetBinOp(TERM_OPERATORS, self.GetFactor, self)
-        if TAKETIME then
-            self.TakeTime:Add("GetTerm", os.clock() - starttime)
-        end
-        return ret
+        return self:GetBinOp(TERM_OPERATORS, self.GetFactor, self)
     end
     
     function ParserUtil:GetExpr()
-        local starttime = os.clock()
-        local ret = self:GetBinOp(EXPR_OPERATORS, self.GetTerm, self)
-        if TAKETIME then
-            self.TakeTime:Add("GetExpr", os.clock() - starttime)
-        end
-        return ret
+        return self:GetBinOp(EXPR_OPERATORS, self.GetTerm, self)
     end
 end
 
 --#region Variables
 
 function ParserUtil:GetVariable()
-    self:Start()
     --TODO: Add table values
     
     -- Is it local
@@ -255,13 +186,10 @@ function ParserUtil:GetVariable()
     local idens = self:GetSeperated("Identifier", true)
     if #idens == 0 then
         if islocal then
-            self:Stop("GetVariable")
             error("Expected an identifier after \"local\" at " .. self.Pos.Counter)
         elseif self.Head:Next().Value == "=" then
-            self:Stop("GetVariable")
             error("Expected an identifier in variable at " .. self.Pos.Counter)
         else
-            self:Stop("GetVariable")
             return
         end
     end
@@ -273,12 +201,10 @@ function ParserUtil:GetVariable()
     if self.Head:Current() and self.Head:Current().Value == "=" then
         init = self:GetSeperated(self.GetExpr, true, self)
         if #init == 0 then
-            self:Stop("GetVariable")
             error("Expected an expression after \"=\" at " .. self.Pos.Counter)
         end
     end
     
-    self:Stop("GetVariable")
     return Node.new(islocal and "LocalStatement" or "AssignmentStatement", {idens, init}, "Variable", self.Pos.Counter)
 end
 
@@ -291,7 +217,6 @@ function ParserUtil:GetArguments()
 end
 
 function ParserUtil:GetCallStatement()
-    local starttime = os.clock()
     local cur = self.Head:Current()
     if not (cur and cur:Is("Identifier")) then
         return
@@ -303,43 +228,25 @@ function ParserUtil:GetCallStatement()
     if cur and cur:Is("Symbol") and cur.Value == "(" then
         self.Head:GoNext()
         local args
-        local callstarttime = os.clock()
         
         -- Could save performance by not calling GetArguments if there are no arguments or if theres only one
         local next, nextnext = self.Head:Current(), self.Head:Next()
         if (next and next.Value == ")") or (nextnext and nextnext.Value == ")") then
-            local perfstarttime = os.clock()
             if next.Value == ")" then
                 args = {}
             else
                 args = { self:GetExpr() }
             end
-            if TAKETIME then
-                self.TakeTime:Add("PerfArguments", os.clock() - perfstarttime)
-            end
         else
             args = self:GetArguments()
-        end
-        if TAKETIME then
-            self.TakeTime:Add("CallArguments", os.clock() - callstarttime)
         end
         
         -- We dont go next, because the parent caller will do that
         if not self.Head:Current().Value == ")" then
-            if TAKETIME then
-                self.TakeTime:Add("GetCallStatement", os.clock() - starttime)
-            end
             error("Expected \")\" after arguments at " .. self.Pos.Counter)
         end
-        
-        if TAKETIME then
-            self.TakeTime:Add("GetCallStatement", os.clock() - starttime)
-        end
+
         return Node.new("CallStatement", {cur, args}, "Statement", self.Pos.Counter)
-    end
-    
-    if TAKETIME then
-        self.TakeTime:Add("GetCallStatement", os.clock() - starttime)
     end
     return
 end

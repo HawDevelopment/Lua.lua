@@ -4,7 +4,7 @@
     28/09/2021
 --]]
 
-local Error = require("Generator.Util.Error")
+local Error = require("src.Generator.Util.Error")
 
 ---@alias BaseError {Name: string, Message: string}
 

@@ -4,9 +4,9 @@
     28/09/2021
 --]]
 
-local LexerHead = require("Generator.Util.LexerHead")
-local Token = require("Generator.Util.Token")
-local Position = require("Generator.Util.Position")
+local LexerHead = require("src.Generator.Util.LexerHead")
+local Token = require("src.Generator.Util.Token")
+local Position = require("src.Generator.Util.Position")
 
 ---@param source string
 ---@param version table<string, table<string | number, Token | BaseError>>
@@ -21,7 +21,7 @@ local function GenerateTokens(source, version)
         end
         
         while true do
-            char = head:GoNext()
+            local char = head:GoNext()
             if not char then
                 break
             elseif not version.INDENTATION[char] and char ~= "\n" then
@@ -124,5 +124,5 @@ end
 ---@param Source string
 return function(Source)
     
-    return GenerateTokens(Source, require("Versions.Lua51"))
+    return GenerateTokens(Source, require("src.Versions.Lua51"))
 end

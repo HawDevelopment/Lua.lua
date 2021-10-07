@@ -4,11 +4,11 @@
     28/09/2021
 --]]
 
-local LexerHead = require("Generator.Util.LexerHead")
-local Token = require("Generator.Util.Token")
-local Position = require("Generator.Util.Position")
+local LexerHead = require("src.Generator.Util.LexerHead")
+local Token = require("src.Generator.Util.Token")
+local Position = require("src.Generator.Util.Position")
 
-local TakeTime = require("Generator.Debug.TakeTime")
+local TakeTime = require("src.Generator.Debug.TakeTime")
 
 local TAKETIME = true
 
@@ -173,5 +173,5 @@ end
 ---@param Source string
 return function(Source)
     
-    return GenerateTokens(Source, require("Versions.Lua51"))
+    return GenerateTokens(Source, require("src.Versions.Lua51"))
 end
