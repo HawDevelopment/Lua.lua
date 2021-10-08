@@ -63,7 +63,6 @@ local function GenerateTokens(source, version)
         Start()
         char = head:Current()
         Stop("GetNext")
-        
         if char == "" then
             break
         elseif char == "\"" or char == "\'" then
@@ -126,13 +125,11 @@ local function GenerateTokens(source, version)
             
             -- DANGER Operators MUST be checked before symbols
         elseif version.OPERATORS[char] then
-            
             local opstarttime = os.clock()
-            Token("Operator", char, "Operator")
+            tokens[#tokens + 1] = Token("Operator", char, "Operator")
             timer:Add("Operator", os.clock() - opstarttime)
             
         elseif version.SYMBOLS[char] then
-            
             local symstarttime = os.clock()
             tokens[#tokens + 1] = Token("Symbol", char, "Symbol")
             timer:Add("Symbol", os.clock() - symstarttime)

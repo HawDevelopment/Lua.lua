@@ -89,13 +89,12 @@ local function GenerateTokens(source, version)
             
             tokens[#tokens + 1] = Token("NumberLiteral", value, "Number")
             
-        elseif version.SYMBOLS[char] then
+            -- DANGER Operators MUST be checked before symbols
+        elseif version.OPERATORS[char] then
+            tokens[#tokens + 1] = Token("Operator", char, "Operator")
             
-            if version.OPERATORS[char] then
-                tokens[#tokens + 1] = Token("Operator", char, "Operator")
-            else
-                tokens[#tokens + 1] = Token("Symbol", char, "Symbol")
-            end
+        elseif version.SYMBOLS[char] then
+            tokens[#tokens + 1] = Token("Symbol", char, "Symbol")
             
         elseif char == "." then
             

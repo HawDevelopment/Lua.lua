@@ -4,7 +4,8 @@
     28/09/2021
 --]]
 
-local DO_CLI = true
+local PRINT_ARG = false
+local DEBUG = false
 
 local USAGE = [[
     USAGE: Lua.lua [SUBCOMMANDS] [FILES]
@@ -42,25 +43,29 @@ local function TakeTime(func, ...)
 end
 
 local function RunFile(source, lexer, parser, interpreter)
-    print("Lexing:")
+    local starttime = os.clock()
+    print("\nLexing:")
     local lextime, tokens = TakeTime(function(...)
         return lexer(...)
     end, source)
-    --PrintTokens(tokens)
+    if PRINT_ARG then
+        PrintTokens(tokens)
+    end
     print("Lexing took: ", lextime .. "s")
-    print("Parsing:")
+    print("\nParsing:")
     local parsetime, parsed = TakeTime(function(...)
         return parser(...)
     end, tokens)
-    -- PrintTokens(parsed)
+    if PRINT_ARG then
+        PrintTokens(parsed)
+    end
     print("Parsing took: ", parsetime .. "s")
-    -- print("Interpreting:")
-    -- interpreter(parsed)
+    print("Total real time: ", (os.clock() - starttime) .. "s")
     print("Total time: ", (parsetime + lextime) .. "s")
     return parsed
 end
 
-return DO_CLI and function(arg)
+return function(arg)
     if #arg == 0 then
         print(USAGE)
         return
@@ -76,9 +81,10 @@ return DO_CLI and function(arg)
         end
     end
     
-    local dodebug = ValueInTable(opt, "debug")
-    local lexer = dodebug and require("src.Generator.Debug.LexerDebug") or Lexer
-    local parser = dodebug and require("src.Generator.Debug.ParserDebug") or Parser
+    DEBUG = ValueInTable(opt, "debug")
+    PRINT_ARG = ValueInTable(opt, "print")
+    local lexer = DEBUG and require("src.Generator.Debug.LexerDebug") or Lexer
+    local parser = DEBUG and require("src.Generator.Debug.ParserDebug") or Parser
     
     if args[1] == "run" then
         local file = io.open(args[2], "r")
@@ -89,9 +95,6 @@ return DO_CLI and function(arg)
         local source = file:read("*a")
         file:close()
         local parsed = RunFile(source, lexer, parser)
-        if ValueInTable(opt, "print") then
-            PrintTokens(parsed)
-        end
         
     elseif args[1] == "sim" then
         
@@ -103,11 +106,6 @@ return DO_CLI and function(arg)
             end
             
             local parsed = RunFile(inp, lexer, parser)
-            if ValueInTable(opt, "print") then
-                PrintTokens(parsed)
-            end
         end
     end
-end or function ()
-    print("Not running CLI mode!")
 end
