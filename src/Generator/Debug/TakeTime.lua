@@ -25,16 +25,10 @@ function TakeTime.new()
 end
 
 function TakeTime:Start()
-    self.Start = os.clock()
-end
-
-function TakeTime:Stop(name)
-    if self.Start then
-        
-        self:Add(name, os.clock() - self.Start)
-        self.Start = nil
-    else
-        error("Tried to stop, but was never started")
+    local start = os.clock()
+    return function (name)
+        local stop = os.clock() - start
+        self:Add(name, stop)
     end
 end
 

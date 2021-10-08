@@ -39,7 +39,7 @@ return function(tokens, version)
     end
     
     print("Real Parser Time: " .. os.clock() - starttime)
-    print(util.TakeTime:rep())
+    print(util.Timer:rep())
     
     return nodes
 end

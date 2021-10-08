@@ -9,33 +9,14 @@ local Token = require("src.Generator.Util.Token")
 local Position = require("src.Generator.Util.Position")
 
 local TakeTime = require("src.Generator.Debug.TakeTime")
+local TakeTimeCopy = require("src.Generator.Debug.TakeTimeCopy")
 
-local TAKETIME = true
-
-local timer
-local function Start()
-    if TAKETIME then
-        timer:Start()
-    end
-end
-
-local function Stop(name)
-    if TAKETIME then
-        timer:Stop(name)
-    end
-end
-
-local function Add(name, time)
-    if TAKETIME then
-        timer:Add(name, time)
-    end
-end
-
+local TAKE_TIME = true
 
 ---@param source string
 ---@param version table<string, table<string | number, Token>>
 local function GenerateTokens(source, version)
-    timer = TakeTime.new()
+    local timer = TAKE_TIME and TakeTime.new() or TakeTimeCopy
     
     local tokens, pos = {}, Position.new(0)
     local head = LexerHead.new(source, pos)
@@ -56,32 +37,33 @@ local function GenerateTokens(source, version)
     local starttime = os.clock()
     
     while head:GoNext() do
-        Start()
-        TrimWhitespaces()
-        Stop("Whitespace")
         
-        Start()
+        local time = timer:Start()
+        TrimWhitespaces()
+        time("Whitespace")
+        
+        time = timer:Start()
         char = head:Current()
-        Stop("GetNext")
+        time("GetNext")
         if char == "" then
             break
         elseif char == "\"" or char == "\'" then
             --TODO: Implement escape characters
             --TODO: Implement multi line strings
             
-            local strstarttime = os.clock()
+            time = timer:Start()
             value = string.match(source, char .. ".-" .. char, pos.Counter)
             if not value then
                 error("Unterminated string literal")
             end
             tokens[#tokens + 1] = Token.new("String", value, "String")
             pos.Counter = pos.Counter + #value - 1
-            Add("String", os.clock() - strstarttime)
+            time("String")
             
         elseif version.IDEN[char] then
             --TODO: Should this check for keywords?
             
-            local idenstarttime = os.clock()
+            time = timer:Start()
             value = string.match(source, "[%a%d_]+", pos.Counter)
             if not value then
                 error("Invalid identifier")
@@ -93,12 +75,12 @@ local function GenerateTokens(source, version)
                 tokens[#tokens + 1] = Token("Identifier", value, "Identifier")
             end
             pos.Counter = pos.Counter + #value - 1
-            Add("Identifier", os.clock() - idenstarttime)
+            time("Identifier")
             
         elseif version.NUM[char] or (char == "." and version.NUM[head:Next()]) then
             
             ---TODO: Support for hexadecimal numbers
-            local numstarttime = os.clock()
+            time = timer:Start()
             value = char
             while version.NUM[head:Next()] do
                 value = value .. head:GoNext()
@@ -121,13 +103,13 @@ local function GenerateTokens(source, version)
             end
             
             tokens[#tokens + 1] = Token("NumberLiteral", value, "Number")
-            Add("Number", os.clock() - numstarttime)
+            time("Number")
             
             -- DANGER Operators MUST be checked before symbols
         elseif version.OPERATORS[char] then
-            local opstarttime = os.clock()
+            time = timer:Start()
             tokens[#tokens + 1] = Token("Operator", char, "Operator")
-            timer:Add("Operator", os.clock() - opstarttime)
+            time("Operator")
             
         elseif version.SYMBOLS[char] then
             local symstarttime = os.clock()
@@ -136,7 +118,7 @@ local function GenerateTokens(source, version)
             
         elseif char == "." then
             
-            local dotstarttime = os.clock()
+            time = timer:Start()
             value = char
             if head:Next() == "." then
                 value = value .. head:GoNext()
@@ -145,21 +127,21 @@ local function GenerateTokens(source, version)
                 end
             end
             tokens[#tokens + 1] = Token("Symbol", value, "Symbol")
-            Add("Dot", os.clock() - dotstarttime)
+            time("Dot")
             
         elseif version.EQUALITY[char] then
             
-            local equalstarttime = os.clock()
+            time = timer:Start()
             if version.EQUALITY[head:Next()] then
                 char = char .. head:GoNext()
             end
             tokens[#tokens + 1] = Token("Symbol", char, "Symbol")
-            Add("Equality", os.clock() - equalstarttime)
+            time("Equality")
         end
     end
     
-    if TAKETIME then
-        print("Real Lexer Time: " .. os.clock() - starttime)
+    print("Real Lexer Time: " .. os.clock() - starttime)
+    if TAKE_TIME then
         print(timer:rep())
     end
     
