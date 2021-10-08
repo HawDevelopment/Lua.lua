@@ -64,17 +64,19 @@ function ParserUtil:GetSeperated(tofind, comma, ...)
             if not (cur.Name == tofind) then
                 break
             end
+            self.Head:GoNext()
         elseif type(tofind) == "function" then
             cur = tofind(...)
         elseif type(tofind) == "table" then
             if not ValueInTable(tofind, cur.Name) then
                 break
             end
+            self.Head:GoNext()
         end
         calltime("SeperateCall")
         
         table.insert(idens, cur)
-        cur = self.Head:Next()
+        cur = self.Head:Current()
         if comma and cur and cur.Value == "," then
             self.Head:GoNext()
         else
@@ -160,7 +162,6 @@ do
                 time("GetUnary")
                 error("Expected a number after unary operator at " .. self.Pos.Counter)
             end
-            self:Stop("GetUnary")
             return Node.new("Unary", {token, num}, "Unary", self.Pos.Counter)
         end
         
@@ -238,11 +239,10 @@ function ParserUtil:GetVariable()
         end
     end
     
-    self.Head:GoNext()
-    
     -- Get expr
     local init
     if self.Head:Current() and self.Head:Current().Value == "=" then
+        self.Head:GoNext()
         init = self:GetSeperated(self.GetExpr, true, self)
         if #init == 0 then
             time("GetVariable")
@@ -268,12 +268,11 @@ function ParserUtil:GetCallStatement()
     local cur = self.Head:Current()
     if not (cur and cur:Is("Identifier")) then
         return
-    else
-        cur = self.Head:GoNext()
     end
     
     -- Is call
-    if cur and cur:Is("Symbol") and cur.Value == "(" then
+    local parantheses = self.Head:GoNext()
+    if parantheses and parantheses:Is("Symbol") and parantheses.Value == "(" then
         self.Head:GoNext()
         local args
         local calltime = self.Timer:Start()
@@ -295,7 +294,7 @@ function ParserUtil:GetCallStatement()
         calltime("CallArguments")
         
         -- We dont go next, because the parent caller will do that
-        if not self.Head:Current().Value == ")" then
+        if self.Head:Current().Value ~= ")" then
             time("GetCallStatement")
             error("Expected \")\" after arguments at " .. self.Pos.Counter)
         end

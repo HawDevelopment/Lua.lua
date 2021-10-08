@@ -55,16 +55,18 @@ function ParserUtil:GetSeperated(tofind, comma, ...)
             if not (cur.Name == tofind) then
                 break
             end
+            self.Head:GoNext()
         elseif type(tofind) == "function" then
             cur = tofind(...)
         elseif type(tofind) == "table" then
             if not ValueInTable(tofind, cur.Name) then
                 break
             end
+            self.Head:GoNext()
         end
         
         table.insert(idens, cur)
-        cur = self.Head:Next()
+        cur = self.Head:Current()
         if comma and cur and cur.Value == "," then
             self.Head:GoNext()
         else
@@ -194,11 +196,10 @@ function ParserUtil:GetVariable()
         end
     end
     
-    self.Head:GoNext()
-    
     -- Get expr
     local init
     if self.Head:Current() and self.Head:Current().Value == "=" then
+        self.Head:GoNext()
         init = self:GetSeperated(self.GetExpr, true, self)
         if #init == 0 then
             error("Expected an expression after \"=\" at " .. self.Pos.Counter)
@@ -220,12 +221,11 @@ function ParserUtil:GetCallStatement()
     local cur = self.Head:Current()
     if not (cur and cur:Is("Identifier")) then
         return
-    else
-        cur = self.Head:GoNext()
     end
     
     -- Is call
-    if cur and cur:Is("Symbol") and cur.Value == "(" then
+    local parantheses = self.Head:GoNext()
+    if parantheses and parantheses:Is("Symbol") and parantheses.Value == "(" then
         self.Head:GoNext()
         local args
         
