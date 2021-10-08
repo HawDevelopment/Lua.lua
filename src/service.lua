@@ -15,9 +15,10 @@ local USAGE = [[
         sim     Takes input and interprets it immediately
 ]]
 
-local Lexer = require("src.Generator.Lexer")
-local Interpreter = require("src.Generator.Interpreter")
-local Parser = require("src.Generator.Parser")
+local Lexer = require("src.Generator.Lexer.init")
+local LexerDebug = require("src.Generator.Lexer.LexerDebug")
+local Parser = require("src.Generator.Parser.init")
+local ParserDebug = require("src.Generator.Parser.ParserDebug")
 
 local unpack = unpack or table.unpack
 
@@ -83,8 +84,8 @@ return function(arg)
     
     DEBUG = ValueInTable(opt, "debug")
     PRINT_ARG = ValueInTable(opt, "print")
-    local lexer = DEBUG and require("src.Generator.Debug.LexerDebug") or Lexer
-    local parser = DEBUG and require("src.Generator.Debug.ParserDebug") or Parser
+    local lexer = DEBUG and LexerDebug or Lexer
+    local parser = DEBUG and ParserDebug or Parser
     
     if args[1] == "run" then
         local file = io.open(args[2], "r")

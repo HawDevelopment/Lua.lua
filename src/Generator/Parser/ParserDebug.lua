@@ -1,5 +1,5 @@
 --[[
-    Parser
+    Parser debug
     HawDevelopment
     29/09/2021
 --]]
@@ -7,10 +7,11 @@
 local Node = require("src.Generator.Util.Node")
 local LexerHead = require("src.Generator.Util.LexerHead")
 local Position = require("src.Generator.Util.Position")
-local ParserUtil = require("src.Generator.Util.ParserUtil")
+local ParserUtil = require("src.Generator.Parser.ParserClassDebug")
 
 return function(tokens, version)
     version = require("src.Versions.Lua51")
+    local starttime = os.clock()
     
     local nodes = {}
     local pos = Position(0)
@@ -36,6 +37,9 @@ return function(tokens, version)
             nodes[#nodes + 1] = util:GetExpr()
         end
     end
+    
+    print("Real Parser Time: " .. os.clock() - starttime)
+    print(util.TakeTime:rep())
     
     return nodes
 end
