@@ -61,16 +61,10 @@ end
 function TableToString(tab, indent)
     local str, stop = "{", (indent or "") .. "}"
     indent = indent and indent .. "\t" or "\t"
-    if tab[2] then
+    if next(tab) then
         str = str .. "\n"
-        
-        for k, v in ipairs(tab) do
-            str = str .. indent .. k .. " = " .. ToString(v, indent) .. ",\n"
-        end
-    else
-        local index, value = next(tab)
-        if index and value then
-            str = str .. " " .. index .. " = " .. ToString(value, indent) .. " "
+        for i, v in pairs(tab) do
+            str = str .. indent .. i .. " = " .. ToString(v, indent) .. ",\n"
         end
     end
     
