@@ -7,12 +7,7 @@
 local LexerHead = require("src.Generator.Util.LexerHead")
 local Token = require("src.Generator.Util.Token")
 local Position = require("src.Generator.Util.Position")
-local LexerUtil = require("src.Generator.Lexer.LexerClassDebug")
-
-local TakeTime = require("src.Generator.Debug.TakeTime")
-local TakeTimeCopy = require("src.Generator.Debug.TakeTimeCopy")
-
-local TAKE_TIME = true
+local LexerUtil = require("src.Generator.Lexer.LexerClass")
 
 return function(source, version)
     version = require("src.Versions.Lua51")

@@ -15,7 +15,7 @@ local USAGE = [[
         sim     Takes input and interprets it immediately
 ]]
 
-local Lexer = require("src.Generator.Lexer.init")
+local Lexer = require("src.Generator.Lexer.Lexer")
 local LexerDebug = require("src.Generator.Lexer.LexerDebug")
 local Parser = require("src.Generator.Parser.Parser")
 local ParserDebug = require("src.Generator.Parser.ParserDebug")
