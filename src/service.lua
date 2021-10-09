@@ -17,7 +17,7 @@ local USAGE = [[
 
 local Lexer = require("src.Generator.Lexer.init")
 local LexerDebug = require("src.Generator.Lexer.LexerDebug")
-local Parser = require("src.Generator.Parser.init")
+local Parser = require("src.Generator.Parser.Parser")
 local ParserDebug = require("src.Generator.Parser.ParserDebug")
 
 local unpack = unpack or table.unpack
