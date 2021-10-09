@@ -7,8 +7,8 @@
 
 local Node = require("src.Generator.Util.Node")
 
-local ParserClassDebug = {}
-ParserClassDebug.__index = ParserClassDebug
+local ParserClass = {}
+ParserClass.__index = ParserClass
 
 local UNARY_OPERATORS = {"+", "-"}
 local NUMBER_OPERATORS = {"+", "-", "*", "/", "%", "^"}
@@ -21,8 +21,8 @@ local NUMBER_OPERATORS_PRECEDENCE = {
     ["^"] = 3
 }
 
-function ParserClassDebug.new(tokens, head)
-    local self = setmetatable({}, ParserClassDebug)
+function ParserClass.new(tokens, head)
+    local self = setmetatable({}, ParserClass)
     
     self.Tokens = tokens
     self.Head = head
@@ -43,11 +43,11 @@ local function ValueInTable(tab, value)
 end
 
 do
-    function ParserClassDebug:IsUnary(token)
+    function ParserClass:IsUnary(token)
         return (token:IsType("Keyword") and token.Value == "not") or (token:Is("Operator") and ValueInTable(UNARY_OPERATORS, token.Value))
     end
     
-    function ParserClassDebug:GetSeperated(tofind, comma, ...)
+    function ParserClass:GetSeperated(tofind, comma, ...)
         if comma == nil then
             comma = true
         end
@@ -82,7 +82,7 @@ do
         return idens
     end
     
-    function ParserClassDebug:PostfixNotation(operators, precedens)
+    function ParserClass:PostfixNotation(operators, precedens)
         
         -- Parse
         local out, ops = {}, {}
@@ -124,7 +124,7 @@ do
         return out
     end
     
-    function ParserClassDebug:GetBinOp(operators, precedens)
+    function ParserClass:GetBinOp(operators, precedens)
         local out, change = self:PostfixNotation(operators, precedens), false
         local left, right, lefti, righti
         while true do
@@ -163,7 +163,7 @@ do
     end
 end
 
-function ParserClassDebug:Walk()
+function ParserClass:Walk()
     local token = self.Head:Current()
     local next = self.Head:Next()
     
@@ -220,4 +220,4 @@ function ParserClassDebug:Walk()
     
 end
 
-return ParserClassDebug
+return ParserClass
