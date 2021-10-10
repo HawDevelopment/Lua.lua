@@ -47,41 +47,6 @@ do
         return (token:IsType("Keyword") and token.Value == "not") or (token:Is("Operator") and ValueInTable(UNARY_OPERATORS, token.Value))
     end
     
-    function ParserClass:GetSeperated(tofind, comma, ...)
-        if comma == nil then
-            comma = true
-        end
-        local idens, cur = {}, nil
-        
-        while true do
-            
-            cur = self.Head:Current()
-            if type(tofind) == "string" then
-                if not (cur.Name == tofind) then
-                    break
-                end
-                self.Head:GoNext()
-            elseif type(tofind) == "function" then
-                cur = tofind(...)
-            elseif type(tofind) == "table" then
-                if not ValueInTable(tofind, cur.Name) then
-                    break
-                end
-                self.Head:GoNext()
-            end
-            
-            table.insert(idens, cur)
-            cur = self.Head:Current()
-            if comma and cur and cur.Value == "," then
-                self.Head:GoNext()
-            else
-                break
-            end
-        end
-        
-        return idens
-    end
-    
     function ParserClass:PostfixNotation(operators, precedens)
         
         -- Parse
@@ -203,9 +168,26 @@ function ParserClass:Walk()
         if next and next.Value == "(" then
             self.Head:GoNext()
             self.Head:GoNext()
-            local args = self:GetSeperated(self.Walk, ")", self)
-            -- Get seperated will go to the next token
-            if self.Head:Current().Value ~= ")" then
+            
+            local args = {}
+            while true do
+                local found = self.Head:Current()
+                if found and found.Value ~= ")" then
+                    local node = self:Walk()
+                    if not node then break end
+                    
+                    self.Head:GoNext()
+                    table.insert(args, node)
+                    if not (self.Head:Next() and self.Head:Next().Value == ",") or not self.Head:Next() then
+                        break
+                    end
+                    self.Head:GoNext()
+                else
+                    break
+                end
+            end
+            
+            if self.Head:Current() and self.Head:Current().Value ~= ")" then
                 error("Expected )")
             end
             
