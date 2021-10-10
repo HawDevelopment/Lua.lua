@@ -75,15 +75,11 @@ function LexerClassDebug:LexIdentifier()
 end
 
 function LexerClassDebug:LexOperator(char)
-    if self.Version.OPERATORS[char] then
-        self.Tokens[#self.Tokens+1] = Token.new("Operator", char, "Operator")
-    end
+    self.Tokens[#self.Tokens+1] = Token.new("Operator", char, "Operator")
 end
 
 function LexerClassDebug:LexSymbol(char)
-    if self.Version.SYMBOLS[char] then
-        self.Tokens[#self.Tokens+1] = Token.new("Symbol", char, "Symbol")
-    end
+    self.Tokens[#self.Tokens+1] = Token.new("Symbol", char, "Symbol")
 end
 
 function LexerClassDebug:LexDot(char)
@@ -103,7 +99,7 @@ end
 do
     function LexerClassDebug:GetInt()
         local value = string.match(self.Source, "[%d]+", self.Pos.Counter)
-        return value, #value
+        return value, #value - 1
     end
     
     local Float1 = "[%d]*[%.][%d]+" .. EXPONENT
@@ -111,13 +107,13 @@ do
     function LexerClassDebug:GetFloat()
         local value = string.match(self.Source, Float1, self.Pos.Counter) or
             string.match(self.Source, Float2, self.Pos.Counter)
-        return value, #value
+        return value, #value - 1
     end
     
     local Hex = "0[xX]%.?" .. HEX_NUMBER .. "*%.?" .. HEX_NUMBER .. "*" .. HEX_EXPONENT
     function LexerClassDebug:GetHex()
         local value = string.match(self.Source, Hex, self.Pos.Counter)
-        return value, #value
+        return value, #value - 1
     end
     
     function LexerClassDebug:LexNumber()
