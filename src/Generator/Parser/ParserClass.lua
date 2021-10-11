@@ -65,12 +65,24 @@ do
                     ops[#ops + 1] = token
                 elseif token.Value == ")" then
                     
+                    local found = false
+                    for i = 1, #ops do
+                        if ops[i].Value == "(" then
+                            found = true
+                            break
+                        end
+                    end
+                    if not found then
+                        break -- This could be in a call statement
+                    end
+                    
                     while ops[#ops] and ops[#ops].Value ~= "(" do
                         
                         out[#out + 1] = ops[#ops]
                         ops[#ops] = nil
                     end
-                    if not ops[#ops].Value == "(" then
+                    print(#ops)
+                    if  not ops[#ops].Value == "(" then
                         error("Expected (")
                     end 
                     ops[#ops] = nil
