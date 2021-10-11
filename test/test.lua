@@ -71,7 +71,7 @@ local function test(program, outlexed, outparsed)
     
     return function (service, _, _)
         
-        local lexed, parsed = service(program, nil, nil, nil, false)
+        local lexed, parsed = service(program, false)
         
         if outlexed and lexed then
             return CheckDeep(outlexed ,lexed)

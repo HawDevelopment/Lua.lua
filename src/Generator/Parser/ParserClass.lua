@@ -81,8 +81,7 @@ do
                         out[#out + 1] = ops[#ops]
                         ops[#ops] = nil
                     end
-                    print(#ops)
-                    if  not ops[#ops].Value == "(" then
+                    if not ops[#ops].Value == "(" then
                         error("Expected (")
                     end 
                     ops[#ops] = nil
