@@ -58,22 +58,29 @@ do
             elseif token:IsType("Number") then
                 out[#out + 1] = token
                 self.Head:GoNext()
-            elseif token:Is("Symbol") and token.Value == "(" then
-                self.Head:GoNext()
-                local parent = self:PostfixNotation(operators, precedens)
-                for i = 1, #parent do
-                    out[#out + 1] = parent[i]
-                end
-                if self.Head:Current().Value == ")" then
-                    self.Head:GoNext()
-                else
-                    error("Expected ')'")
-                end
+            
+            elseif token:Is("Symbol") then
                 
+                if token.Value == "(" then
+                    ops[#ops + 1] = token
+                elseif token.Value == ")" then
+                    
+                    while ops[#ops] and ops[#ops].Value ~= "(" do
+                        
+                        out[#out + 1] = ops[#ops]
+                        ops[#ops] = nil
+                    end
+                    if not ops[#ops].Value == "(" then
+                        error("Expected (")
+                    end 
+                    ops[#ops] = nil
+                end
+            
             elseif token:Is("Operator") and ValueInTable(operators, token.Value) then
-                while ops[#ops] and precedens[ops[#ops].Value] > precedens[token.Value] do
+                while ops[#ops] and ops[#ops].Value ~= "(" and precedens[ops[#ops].Value] >= precedens[token.Value] do
                     out[#out + 1] = ops[#ops]
                     ops[#ops] = nil
+                    print(1)
                 end
                 
                 ops[#ops + 1] = token
