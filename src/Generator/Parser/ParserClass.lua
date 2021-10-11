@@ -75,12 +75,12 @@ do
                     end 
                     ops[#ops] = nil
                 end
+                self.Head:GoNext()
             
             elseif token:Is("Operator") and ValueInTable(operators, token.Value) then
                 while ops[#ops] and ops[#ops].Value ~= "(" and precedens[ops[#ops].Value] >= precedens[token.Value] do
                     out[#out + 1] = ops[#ops]
                     ops[#ops] = nil
-                    print(1)
                 end
                 
                 ops[#ops + 1] = token
