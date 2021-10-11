@@ -19,6 +19,7 @@ function RunTest(torun, name, indent)
     
     if type(torun) == "function" then
         total = total + 1
+        print(indent .. "Running test: " .. name)
         local succes, result, out = pcall(torun, Service, Token, Node)
         if succes then
             if not result then
@@ -33,6 +34,7 @@ function RunTest(torun, name, indent)
             print(indent .. "Test: " .. name .. " error!\n" .. result)
             failed = failed + 1
         end
+        print(indent .. "End of test: " .. name)
         
     
     elseif type(torun) == "table" then

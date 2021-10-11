@@ -48,17 +48,18 @@ function Node:Copy()
     return Node.new(self.Name, self.Value, self.Type, self.Copy and self.Pos:Copy() or nil)
 end
 
+local TableToString
 local function ToString(v, indent)
     if type(v) == "table" and v.Name and v.Type then
         return v:rep(indent)
     elseif type(v) == "table" then
-        return TableToString(v)
+        return TableToString(v, indent)
     else
         return tostring(v)
     end
 end
 
-function TableToString(tab, indent)
+TableToString = function(tab, indent)
     local str, stop = "{", (indent or "") .. "}"
     indent = indent and indent .. "\t" or "\t"
     if next(tab) then
