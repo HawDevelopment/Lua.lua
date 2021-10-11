@@ -15,16 +15,16 @@ local function TakeTime(func, ...)
     return os.clock() - start, unpack(arg)
 end
 
-local function PrintFile(source, lexer, parser, interpreter)
+local function PrintFile(source)
     local starttime = os.clock()
     print("\nLexing:")
     local lextime, tokens = TakeTime(function(...)
-        return lexer(...)
+        return Lexer(...)
     end, source)
     print("Lexing took: ", lextime .. "s")
     print("\nParsing:")
     local parsetime, parsed = TakeTime(function(...)
-        return parser(...)
+        return Parser(...)
     end, tokens)
     print("Parsing took: ", parsetime .. "s")
     print("Total real time: ", (os.clock() - starttime) .. "s")
@@ -32,15 +32,15 @@ local function PrintFile(source, lexer, parser, interpreter)
     return tokens, parsed
 end
 
-function RunFile(source, lexer, parser)
+function RunFile(source)
     local succes, tokens = pcall(function()
-        return lexer(source)
+        return Lexer(source)
     end)
     if not succes then
         print("Lexing failed: ", tokens)
     end
     local succes, parsed = pcall(function()
-        return parser(tokens)
+        return Parser(tokens)
     end)
     if not succes then
         print("Parsing failed: ", parsed)
@@ -48,19 +48,17 @@ function RunFile(source, lexer, parser)
     return tokens, parsed
 end
 
-return function(source, lexer, parser, interpreter, shouldprint)
+return function(source, shouldprint)
     source = source or ""
-    lexer = lexer or Lexer
-    parser = parser or Parser
     if shouldprint == nil then
         shouldprint = true
     end
     
     local lexed, parsed
     if shouldprint then
-        lexed, parsed = PrintFile(source, lexer, parser, interpreter)
+        lexed, parsed = PrintFile(source)
     else
-        lexed, parsed = RunFile(source, lexer, parser)
+        lexed, parsed = RunFile(source)
     end
     
     return lexed, parsed

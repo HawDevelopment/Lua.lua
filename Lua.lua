@@ -6,11 +6,6 @@
 
 local Service = require("src.service")
 
-local Lexer = require("src.Generator.Lexer.Lexer")
-local LexerDebug = require("src.Generator.Lexer.LexerDebug")
-local Parser = require("src.Generator.Parser.Parser")
-local ParserDebug = require("src.Generator.Parser.ParserDebug")
-
 local USAGE = [[
     USAGE: Lua.lua [SUBCOMMANDS] [FILES]
     
@@ -18,8 +13,6 @@ local USAGE = [[
         run     Runs a file
         sim     Takes input and interprets it immediately
 ]]
-
-local unpack = unpack or table.unpack
 
 local function PrintTokens(tokens)
     for _, tok in pairs(tokens) do
@@ -54,8 +47,6 @@ function RunCommand()
     
     DEBUG = ValueInTable(opt, "debug")
     PRINT_ARG = ValueInTable(opt, "print")
-    local lexer = DEBUG and LexerDebug or Lexer
-    local parser = DEBUG and ParserDebug or Parser
     
     if args[1] == "run" then
         local file = io.open(args[2], "r")
@@ -65,7 +56,7 @@ function RunCommand()
         
         local source = file:read("*a")
         file:close()
-        local lexed, parsed = Service(source, lexer, parser, nil, DEBUG)
+        local lexed, parsed = Service(source, DEBUG)
         if PRINT_ARG then
             if type(lexed) == "table" then
                 print("Lexed tokens:")
@@ -86,7 +77,7 @@ function RunCommand()
                 return
             end
             
-            local lexed, parsed = Service(inp, lexer, parser, nil, DEBUG)
+            local lexed, parsed = Service(inp, DEBUG)
             if PRINT_ARG then
                 if type(lexed) == "table" then
                     print("Lexed tokens:")
