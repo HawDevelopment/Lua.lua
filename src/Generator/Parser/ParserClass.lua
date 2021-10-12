@@ -172,11 +172,11 @@ function ParserClass:Walk()
     end
     if token:IsType("Keyword") then
         if token.Value == "true" then
-            return Node.new("BooleanLiteral", true, "Boolean", token.Pos)
+            return Node.new("BooleanLiteral", "true", "Boolean", token.Pos)
         elseif token.Value == "false" then
-            return Node.new("BooleanLiteral", false, "Boolean", token.Pos)
+            return Node.new("BooleanLiteral", "false", "Boolean", token.Pos)
         elseif token.Value == "nil" then
-            return Node.new("NilLiteral", nil, "Nil", token.Pos)
+            return Node.new("NilLiteral", "nil", "Nil", token.Pos)
         else
             return Node.new("Keyword", token.Value, "Keyword", token.Pos)
         end
