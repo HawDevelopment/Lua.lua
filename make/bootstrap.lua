@@ -11,4 +11,4 @@ package.path = table.concat({
     root .. "/?.lua",
     root .. "/?/init.lua",
 }, ";")
-assert(require("src.service"))(arg)
+assert(require("Lua"))

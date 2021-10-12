@@ -92,4 +92,7 @@ function RunCommand()
     end
 end
 
-RunCommand()
+if arg then
+    RunCommand()
+end
+return RunCommand
