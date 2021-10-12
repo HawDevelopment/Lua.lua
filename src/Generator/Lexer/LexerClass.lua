@@ -46,6 +46,16 @@ do
         local value = string.match(self.Source, "[%a_][%a%d_]*", self.Pos.Counter)
         return value, #value - 1
     end
+    
+    function LexerClass:GetMultiline()
+        local value = string.match(self.Source, "%[=*%[[.%s%p%a]*%]=*%]", self.Pos.Counter)
+        return value, #value - 1
+    end
+    
+    function LexerClass:GetToLineEnd()
+        local value = string.match(self.Source .. "\n", "[.%s%p%a]-\n", self.Pos.Counter)
+        return value, #value - 1
+    end
 end
 
 function LexerClass:LexString(char)
@@ -93,6 +103,27 @@ function LexerClass:LexDot(char)
         end
     end
     self.Tokens[#self.Tokens+1] = Token.new("Symbol", char, "Symbol")
+end
+
+-- Comment
+function LexerClass:TrimComment()
+    self.Head:GoNext()
+    
+    local islong = false
+    if self.Head:GoNext() == "[" and self.Head:Next() == "[" then
+        local val, len = self:GetMultiline()
+        if val then
+            islong = true
+            self.Pos.Counter = self.Pos.Counter + len
+        end
+    end
+    
+    if not islong then
+        local val, len = self:GetToLineEnd()
+        if val then
+            self.Pos.Counter = self.Pos.Counter + len
+        end
+    end
 end
 
 -- Number
@@ -153,6 +184,10 @@ function LexerClass:Walk()
     
     while true do
         local char = self:TrimWhitespaces(self.Head:GoNext())
+        while char == "-" and self.Head:Next() == "-" do
+            self:TrimComment()
+            char = self:TrimWhitespaces(self.Head:GoNext())
+        end
         local version = self.Version
         
         if char == "" or not char then
