@@ -95,8 +95,8 @@ end
 function LexerClass:LexDot(char)
     
     if self.Head:GoNext() == "." then
-        char = char .. self.Head:GoNext()
-        if self.Head:Next() == "." then
+        char = char .. self.Head:Current()
+        if self.Head:GoNext() == "." then
             -- Var arg
             self.Tokens[#self.Tokens+1] = Token.new("VarArgLiteral", "...", "Symbol")
             return
