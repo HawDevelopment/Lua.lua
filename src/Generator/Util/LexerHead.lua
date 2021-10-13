@@ -53,4 +53,24 @@ function LexerHead:GoLast()
     return self.Thing[self.Pos:Last()]
 end
 
+function LexerHead:Consume(toconsum)
+    local cur, ret = self.Thing[self.Pos.Counter], false
+    if type(cur) == "table" then
+        ret = cur.Value == toconsum
+    else
+        ret = cur == toconsum
+    end
+    if ret then
+        self.Pos.Counter = self.Pos.Counter + 1
+    end
+    return ret
+end
+
+function LexerHead:Expect(toexpect, err)
+    err = err or "Unexpected char"
+    if not LexerHead:Consume(toexpect) then
+        error(err)
+    end
+end
+
 return LexerHead
