@@ -69,17 +69,23 @@ end
 
 local function test(program, outlexed, outparsed)
     
-    return function (service, _, _)
-        
-        local lexed, parsed = service(program, false)
-        
-        if outlexed and lexed then
-            return CheckDeep(outlexed ,lexed)
+    return function (_, lexer, parser)
+        local output, ran = true, false
+        local lexed = lexer(program)
+        if outlexed then
+            output = output and CheckDeep(outlexed, lexed)
+            ran = true
         end
-        if outparsed and parsed then
-            return CheckDeep(outparsed, parsed)
+        if outparsed then
+            local parsed = parser(lexed)
+            output = output and CheckDeep(outparsed, parsed)
+            ran = true
         end
-        return false
+        
+        if not ran then
+            output = false
+        end
+        return output
     end
 end
 
