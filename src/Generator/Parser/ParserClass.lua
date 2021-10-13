@@ -31,6 +31,125 @@ function ParserClass.new(tokens, head)
     return self
 end
 
+function ParserClass:ParseChunk()
+    
+    local body = self:ParseBody()
+    if self.Head:Next() then
+        error("Unexpected token: " .. self.Head:Next():rep())
+    end
+    return Node.new("Chunk", body, "Chunk", 0)
+end
+
+local function IsBodyCloser(token)
+    if not token then
+        return true
+    elseif not token:IsType("Keyword") then
+        return false
+    end
+    if token:Is("else") or token:Is("elseif") or token:Is("end") or token:Is("until") then
+        return true
+    end
+    return false
+end
+
+function ParserClass:ParseBody()
+    local body, statement = {}, nil
+    
+    while not IsBodyCloser(self.Head:Current()) do
+        
+        local cur = self.Head:Current()
+        if cur and cur:Is("return") or cur:Is("break") then
+            table.insert(body, #body + 1, self:ParseStatement())
+            break
+        end
+        
+        statement = self:ParseStatement()
+        if statement then
+            table.insert(body, #body + 1, statement)
+        end
+    end
+    
+    return body
+end
+
+local KeywordToFunction = {
+    ["local"] = "ParseLocalStatement",
+    ["if"] = "ParseIfStatement",
+    ["return"] = "ParseReturnStatement",
+    ["function"] = "ParseFunctionStatement",
+    ["while"] = "ParseWhileStatement",
+    ["for"] = "ParseForStatement",
+    ["repeat"] = "ParseRepearStatement",
+    ["break"] = "ParseBreakStatement",
+    ["do"] = "ParseDoStatement",
+}
+
+function ParserClass:ParseStatement(cur)
+    cur = cur or self.Head:Current()
+    
+    if cur:IsType("Keyword") then
+        
+        local index = KeywordToFunction[cur.Name]
+        if index then
+            return self[index](self, cur)
+        else
+            error("Unimplemented keyword: " .. cur.Name)
+        end
+    end
+    
+    -- If its not a keyword it then it must be assignment or call
+    return self:ParseAssignmentOrCallStatement(cur)
+end
+
+-- Statements
+
+-- Break
+function ParserClass:ParseBreakStatement(cur)
+    cur = cur or self.Head:Current()
+    self.Head:GoNext()
+    return Node.new("BreakStatement", cur.Value, "Statement", self.Pos.Counter - 1)
+end
+
+-- Do
+function ParserClass:ParseDoStatement(cur)
+    self.Head:GoNext()
+    self.Head:Next()
+    local body = self:ParseBody()
+    self.Head:GoNext()
+    self.Head:Expect("end", "Expected end after do body!")
+    self.Head:GoNext()
+    return Node.new("DoStatement", body, "Statement", self.Pos.Counter - 1)
+end
+
+-- While
+function ParserClass:ParseWhileStatement(cur)
+    self.Head:GoNext()
+    local con = self:ParseExpectedExpression()
+    self.Head:Expect("do", "Expected do after while condition!")
+    local body = self:ParseBody()
+    self.Head:GoNext()
+    self.Head:Expect("end", "Expected end after while!")
+    self.Head:GoNext()
+    return Node.new("WhileStatement", {
+        con = con,
+        body = body
+    }, "Statement", self.Pos.Counter - 1)
+end
+
+-- Repeat
+function ParserClass:ParseRepeatStatement(cur)
+    self.Head:GoNext()
+    local body = self:ParseBody()
+    self.Head:GoNext()
+    self.Head:Expect("until", "Expected until after repear!")
+    local con = self:ParseExpectedExpression()
+    self.Head:GoNext()
+    return Node.new("RepearStatement", {
+        con = con,
+        body = body
+    }, "Statement", self.Pos.Counter - 1)
+end
+
 -- UTIL
 
 local function ValueInTable(tab, value)
