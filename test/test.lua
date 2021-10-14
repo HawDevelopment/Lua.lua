@@ -70,22 +70,27 @@ end
 local function test(program, outlexed, outparsed)
     
     return function (_, lexer, parser)
-        local output, ran = true, false
+        local output, ran, out = true, false, nil
         local lexed = lexer(program)
         if outlexed then
-            output = output and CheckDeep(outlexed, lexed)
+            local ret, newout = CheckDeep(outlexed, lexed)
+            output = output and ret
+            out = newout
             ran = true
         end
         if outparsed then
             local parsed = parser(lexed)
-            output = output and CheckDeep(outparsed, parsed)
+            -- We use parsed.Value since parsed is a chunk node.
+            local ret, newout = CheckDeep(outparsed, parsed.Value)
+            output = output and ret
+            out = newout
             ran = true
         end
         
         if not ran then
             output = false
         end
-        return output
+        return output, out
     end
 end
 
