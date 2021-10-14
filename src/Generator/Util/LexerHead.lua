@@ -68,9 +68,20 @@ end
 
 function LexerHead:Expect(toexpect, err)
     err = err or "Unexpected char"
-    if not LexerHead:Consume(toexpect) then
-        error(err)
+    if not self:Consume(toexpect) then
+        error(err, 2)
     end
+end
+
+function LexerHead:GoNextAndConsume(toconsum)
+    self:GoNext()
+    local ret = self:Consume(toconsum)
+    return ret
+end
+
+function LexerHead:GoNextAndExpect(toexpect, err)
+    self:GoNext()
+    self:Expect(toexpect, err)
 end
 
 return LexerHead

@@ -15,8 +15,12 @@ local USAGE = [[
 ]]
 
 local function PrintTokens(tokens)
-    for _, tok in pairs(tokens) do
-        print(tok:rep())
+    if tokens.Name and tokens.Name == "Chunk" then
+        print(tokens:rep())
+    else
+        for _, tok in pairs(tokens) do
+            print(tok:rep())
+        end
     end
 end
 

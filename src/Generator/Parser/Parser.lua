@@ -12,14 +12,10 @@ local ParserUtil = require("src.Generator.Parser.ParserClass")
 return function(tokens, version)
     version = require("src.Versions.Lua51")
     
-    local nodes = {}
-    local pos = Position(0)
+    
+    local pos = Position(1)
     local head = LexerHead.new(tokens, pos)
     local util = ParserUtil.new(tokens, head)
     
-    while head:GoNext() do
-        nodes[#nodes+1] = util:Walk()
-    end
-    
-    return nodes
+    return util:ParseChunk()
 end
