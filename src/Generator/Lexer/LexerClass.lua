@@ -77,8 +77,14 @@ function LexerClass:LexIdentifier()
     end
     self.Pos.Counter = self.Pos.Counter + length
     
-    if self.Version[value] then
-        self.Tokens[#self.Tokens + 1] = Token.new(value, value, "Keyword")
+    if self.Version.KEYWORDS[value] then
+        if self.Version.BOOLEAN[value] then
+            self.Tokens[#self.Tokens + 1] = Token.new("BooleanLiteral", value, "Boolean")
+        elseif value == "nil" then
+            self.Tokens[#self.Tokens + 1] = Token.new("NilLiteral", value, "Boolean")
+        else
+            self.Tokens[#self.Tokens + 1] = Token.new(value, value, "Keyword")
+        end
     else
         self.Tokens[#self.Tokens + 1] = Token.new(value, value, "Identifier")
     end

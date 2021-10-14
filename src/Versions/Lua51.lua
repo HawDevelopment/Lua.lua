@@ -18,12 +18,14 @@ local OPERATORS = ToTable("+-*/^#%")
 local EQUALITY = ToTable("=><~")
 
 local KEYWORDS = ToTable("and break do else elseif end false for function if in local nil not or repeat return then true until while", nil, "[^%s]+")
+local BOOLEAN = ToTable("true false", nil, "[^%s]+")
 
 return {
     SYMBOLS = SYMBOLS,
     OPERATORS = OPERATORS,
     EQUALITY = EQUALITY,
     KEYWORDS = KEYWORDS,
+    BOOLEAN = BOOLEAN,
     INDENTATION = INDENTATION,
     NEW_LINE = NEW_LINE,
     NUM = NUM,
