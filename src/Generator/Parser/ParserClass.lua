@@ -265,18 +265,17 @@ function ParserClass:ParseLocalStatement()
     if name:IsType("Identifier") then
         -- Typical local
         
-        local vars, init = {name}, {}
+        local vars, init = { name }, nil
         while self.Head:Consume(",") do
             table.insert(vars, #vars + 1, self:GetIdentifier())
         end
+        self.Head:GoNext()
         
         -- Init values
         if self.Head:Consume("=") then
-            while true do
+            init = { self:ParseExpectedExpression() }
+            while self.Head:Consume(",") do
                 table.insert(init, #init + 1, self:ParseExpectedExpression())
-                if not self.Head:Consume(",") then
-                    break
-                end
             end
         end
         
@@ -304,47 +303,50 @@ local AssignmentOrCallStatementTab = {
 function ParserClass:ParseAssignmentOrCallStatement(cur)
     cur = cur or self.Head:Current()
     
-    local names, base, localval = {}, nil, nil
+    -- Get all identifiers or expressions
+    local names, base, isassignment = {}, nil, nil
     while true do
         
+        -- Find identifier
         if cur:IsType("Identifier") then
             base = self:GetIdentifier()
-            localval = true -- Could be a function call
+            isassignment = true -- We check if it could be a call later
         elseif cur.Value == "(" then
             self.Head:GoNext()
             base = self:ParseExpectedExpression()
             self.Head:Expect(")", "Expected ) after expression!")
-            localval = nil -- Can only be a function call
+            isassignment = nil -- Can only be a function call
         else
             error("Expected assignment or call!")
         end
         
         -- Find prefixes, eg. "os.clock"
         while true do
-            local newcur = self.Head:Current()
-            if not newcur then
+            cur = self.Head:Current()
+            if not cur then
                 break
-            end
-            if newcur and newcur:IsType("Symbol") and AssignmentOrCallStatementTab[newcur.Value] then
+            elseif cur:IsType("Symbol") then
                 
-                local val = AssignmentOrCallStatementTab[newcur.Value]
+                local val = AssignmentOrCallStatementTab[cur.Value]
                 if val == 1 then
-                    localval = true
+                    isassignment = true
                 elseif val == 2 then
-                    localval = nil
+                    isassignment = nil -- (, :, { can be used in function calls
+                else
+                    break
                 end
-            elseif newcur and newcur:IsType("String") then
-                localval = nil
+            elseif cur:IsType("String") then
+                isassignment = nil -- String cant be used as an assignment name
             else
                 break
             end
-            base = self:ParsePrefixExpressionPart(base, newcur)
+            base = self:GetPrefixExpressionBase(base, cur)
         end
         
         table.insert(names, #names + 1, base)
         if not self.Head:Consume(",") then
             break
-        elseif not localval then
+        elseif not isassignment then
             return error("Unexpected statement")
         end
         
@@ -352,12 +354,14 @@ function ParserClass:ParseAssignmentOrCallStatement(cur)
     end
     
     -- Call statement
-    if #names == 1 and localval == nil then
+    if #names == 1 and isassignment == nil then
         return Node.new("CallStatement", names[1], "Statement", self.Pos.Counter - 1)
-    elseif not localval then
+    elseif not isassignment then
+        -- We found to names but it is not a call?
         return error("Unexpected token")
     end
     
+    -- If its not a call statement then it must be an assignment
     self.Head:Expect("=")
     
     local expressions = {}
@@ -397,18 +401,16 @@ function ParserClass:GetFunctionDefinition(name, islocal)
     
     if not self.Head:Consume(")") then
         -- There are some params
-        
         while true do
             local cur = self.Head:Current()
-            if cur:IsType("Identifier") then
-                table.insert(params, #params + 1, self:GetIdentifier(cur))
+            if cur:Is("VarArgLiteral") then
+                table.insert(params, #params + 1, cur)
+                break -- Vararg is the last param
+            elseif cur:IsType("Identifier") and self.Head:Next() then
+                table.insert(params, #params + 1, self:GetIdentifier())
                 if not self.Head:Consume(",") then
                     break
                 end
-                
-            elseif cur:Is("VarArgLiteral") then
-                table.insert(params, #params + 1, cur)
-                break
             else
                 error("Expected identifier or vararg!")
             end
@@ -417,7 +419,7 @@ function ParserClass:GetFunctionDefinition(name, islocal)
     end
     
     local body = self:ParseBody()
-    self.Head:GoNextAndExpect("end", "Expected end after function body!")
+    self.Head:Expect("end", "Expected end after function body!")
     
     return Node.new("FunctionStatement", {
         name = name,
@@ -482,7 +484,7 @@ function ParserClass:GetTableContructor()
                 table.insert(values, #values + 1, Node.new("TableConstructorValue", value, "TableConstructor"))
             end
         else
-            value = self:ParseExpression()
+            value = self:GetExpression()
             if not value then
                 break
             end
@@ -501,12 +503,12 @@ function ParserClass:GetTableContructor()
     return Node.new("TableConstructor", values, "Expression")
 end
 
-function ParserClass:ParseExpression()
-    return self:ParseSubExpression(0)
+function ParserClass:GetExpression()
+    return self:GetSubExpression(0)
 end
 
 function ParserClass:ParseExpectedExpression()
-    local expr = self:ParseExpression()
+    local expr = self:GetExpression()
     if not expr then
         error("Expected expression!")
     end
@@ -526,6 +528,9 @@ local Precedens = {
 
 function ParserClass:GetPrecedence(cur)
     cur = cur or self.Head:Current()
+    if not cur then
+        return 0
+    end
     return Precedens[cur.Value] or 0
 end
 
@@ -537,15 +542,15 @@ local function IsUnary(name)
     return Unary[name]
 end
 
--- Main expression
-function ParserClass:ParseSubExpression(minprec)
+-- Sub expression
+function ParserClass:GetSubExpression(minprec)
     local op, expr = self.Head:Current(), nil
     
     if IsUnary(op.Value) then
         -- Unary expr
         self.Head:GoNext()
         -- 7 is the precedence of unary
-        local subexpr = self:ParseSubExpression(7)
+        local subexpr = self:GetSubExpression(7)
         if not subexpr then
             error("Expected expression after unary operator!")
         end
@@ -555,11 +560,11 @@ function ParserClass:ParseSubExpression(minprec)
         }, "Expression")
     else
         -- Primary
-        expr = self:ParsePrimaryExpression()
+        expr = self:GetLiteral()
         
         -- Prefix
         if not expr then
-            expr = self:ParsePrefixExpression()
+            expr = self:GetPrefixExpression()
         end
     end
     
@@ -567,7 +572,7 @@ function ParserClass:ParseSubExpression(minprec)
         return nil
     end
     
-    -- Precedence
+    -- Binop
     local precedence
     while true do
         op = self.Head:Current()
@@ -581,11 +586,11 @@ function ParserClass:ParseSubExpression(minprec)
             precedence = precedence - 1
         end
         self.Head:GoNext()
-        local subexpr = self:ParseSubExpression(precedence)
+        
+        local subexpr = self:GetSubExpression(precedence)
         if not subexpr then
             self.Head:GoNext()
             break
-            --error("Expected expression after operator!\n" .. debug.traceback())
         end
         expr = Node.new("BinaryExpression", {
             op = op,
@@ -597,7 +602,7 @@ function ParserClass:ParseSubExpression(minprec)
     return expr
 end
 
-function ParserClass:ParsePrefixExpressionPart(base, cur)
+function ParserClass:GetPrefixExpressionBase(base, cur)
     cur = cur or self.Head:Current()
     
     if cur:IsType("Symbol") then
@@ -614,16 +619,16 @@ function ParserClass:ParsePrefixExpressionPart(base, cur)
             base = CreateMembership(base, ":", self:GetIdentifier())
             
             -- : Can only be once in the last index, so this must be a call expression
-            return self:ParseCallExpression(base)
+            return self:GetCallExpression(base)
         elseif cur.Value == "(" or cur.Value == "{" then
-            return self:ParseCallExpression(base)
+            return self:GetCallExpression(base)
         end
     elseif cur:IsType("String") then
-        return self:ParseCallExpression(base)
+        return self:GetCallExpression(base)
     end
 end
 
-function ParserClass:ParsePrefixExpression(cur)
+function ParserClass:GetPrefixExpression(cur)
     cur = cur or self.Head:Current()
     local name, base
     
@@ -639,7 +644,7 @@ function ParserClass:ParsePrefixExpression(cur)
     
     -- Suffix
     while true do
-        local part = self:ParsePrefixExpressionPart(base)
+        local part = self:GetPrefixExpressionBase(base)
         if not part then
             break
         end
@@ -649,19 +654,17 @@ function ParserClass:ParsePrefixExpression(cur)
     return base
 end
 
-function ParserClass:ParseCallExpression(base, cur)
+function ParserClass:GetCallExpression(base, cur)
     cur = cur or self.Head:Current()
     
     if cur:IsType("Symbol") then
         
         if cur.Value == "(" then
-            
-            
             local exprs = {}
             
             self.Head:GoNext()
             if self.Head:Current().Value ~= ")" then
-                local expr = self:ParseExpression()
+                local expr = self:GetExpression()
                 if expr then
                     table.insert(exprs, #exprs + 1, expr)
                 end
@@ -688,13 +691,13 @@ function ParserClass:ParseCallExpression(base, cur)
     elseif cur:IsType("String") then
         return Node.new("StringCallExpression", {
             base = base,
-            arg = self:ParsePrimaryExpression(cur),
+            arg = self:GetLiteral(cur),
         }, "Expression")
     end
     error("Unexpected function argument")
 end
 
-function ParserClass:ParsePrimaryExpression(cur)
+function ParserClass:GetLiteral(cur)
     cur = cur or self.Head:Current()
     
     if cur:IsType("String") or cur:IsType("Number") or cur:IsType("Boolean") or cur:Is("VarArgLiteral") or cur:Is("NilLiteral") then
