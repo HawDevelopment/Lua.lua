@@ -69,27 +69,23 @@ end
 
 local function test(program, outlexed, outparsed)
     
-    return function (_, lexer, parser)
+    return function (Lua)
         local output, ran, out = true, false, nil
-        local lexed = lexer(program)
+        local lexed = Lua.Lex(program)
         if outlexed then
             local ret, newout = CheckDeep(outlexed, lexed)
             output = output and ret
             out = newout
-            ran = true
         end
         if outparsed then
-            local parsed = parser(lexed)
+            local parsed = Lua.Parse(lexed)
             -- We use parsed.Value since parsed is a chunk node.
             local ret, newout = CheckDeep(outparsed, parsed.Value)
             output = output and ret
             out = newout
-            ran = true
         end
         
-        if not ran then
-            output = false
-        end
+        print(output)
         return output, out
     end
 end

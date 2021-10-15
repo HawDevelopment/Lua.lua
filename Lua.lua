@@ -4,7 +4,8 @@
     07/10/2021
 --]]
 
-local Service = require("src.service")
+local Lua = require("src.service")
+local unpack = unpack or table.unpack
 
 local USAGE = [[
     USAGE: Lua.lua [SUBCOMMANDS] [FILES]
@@ -23,7 +24,6 @@ local function PrintTokens(tokens)
         end
     end
 end
-
 local function ValueInTable(tab, value)
     for _, val in pairs(tab) do
         if val == value then
@@ -32,6 +32,31 @@ local function ValueInTable(tab, value)
     end
     return false
 end
+
+local function TakeTime(func, ...)
+    local start = os.clock()
+    local arg = { func(...) }
+    return os.clock() - start, unpack(arg)
+end
+
+function RunSource(source, debug)
+    local ast, tokens
+    if debug then
+        -- Taketime
+        local alltime, time = os.clock(), nil
+        time, tokens = TakeTime(Lua.Lex, source)
+        print("Lexing took " .. time .. "s")
+        time, ast = TakeTime(Lua.Parse, tokens)
+        print("Parsing took " .. time .. "s")
+        alltime = os.clock() - alltime
+        print("Total time " .. alltime .. "s")
+    else
+        tokens = Lua.Lex(source)
+        ast = Lua.Parse(tokens)
+    end
+    return tokens, ast
+end
+
 
 function RunCommand()
     if #arg == 0 then
@@ -60,7 +85,8 @@ function RunCommand()
         
         local source = file:read("*a")
         file:close()
-        local lexed, parsed = Service(source, DEBUG)
+        local lexed, parsed = RunSource(source, DEBUG)
+        
         if PRINT_ARG then
             if type(lexed) == "table" then
                 print("Lexed tokens:")
@@ -81,7 +107,8 @@ function RunCommand()
                 return
             end
             
-            local lexed, parsed = Service(inp, DEBUG)
+            local lexed, parsed = RunSource(inp, DEBUG)
+            
             if PRINT_ARG then
                 if type(lexed) == "table" then
                     print("Lexed tokens:")
