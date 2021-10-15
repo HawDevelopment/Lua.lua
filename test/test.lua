@@ -85,7 +85,6 @@ local function test(program, outlexed, outparsed)
             out = newout
         end
         
-        print(output)
         return output, out
     end
 end
