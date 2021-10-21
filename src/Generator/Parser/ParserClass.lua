@@ -4,6 +4,7 @@
     09/10/2021
 --]]
 
+local ALLOW_SELF_MATH = true -- Allow math to be alone (not being in a statement)
 
 local Node = require("src.Generator.Util.Node")
 
@@ -81,6 +82,8 @@ function ParserClass:ParseStatement(cur)
         else
             error("Unexpected token " .. cur:rep())
         end
+    elseif ALLOW_SELF_MATH and (cur:IsType("Number") or cur:IsType("Operator")) then
+        return self:GetExpression()
     end
     
     -- If its not a keyword it then it must be assignment or call
