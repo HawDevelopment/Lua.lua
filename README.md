@@ -1,6 +1,13 @@
 # Lua.lua
 
-Lua interpreter made in Lua. Im working on a way to build the interpreter so you can run it anywhere.
+Lua interpreter made in Lua.
+
+Current progress:
+- ✔ Lexer
+- ✔ Parser
+- ❌ Full code covrage
+- ⚒ Compiler
+- ❌ Interpreter
 
 # Usage
 
@@ -70,7 +77,7 @@ Run builder:
 -   Running build version:
 
     ```bash
-    bin/<os>/Lua.exe run <script.lua>
+    bin/<os>/Lua(.exe if windows) run <script.lua>
     ```
 
 If you want to contribute, please open an issue or pull request.
