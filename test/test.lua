@@ -4,28 +4,36 @@
     09/10/2021
 --]]
 
-local TableToString
-local function ToString(v, indent)
-    if type(v) == "table" and (v.Name or v.Type or v.Value) then
-        return v:rep(indent)
-    elseif type(v) == "table" then
-        return TableToString(v, indent)
-    else
-        return tostring(v)
-    end
-end
-
-TableToString = function(tab, indent)
-    local str, stop = "{", (indent or "") .. "}"
-    indent = indent and indent .. "\t" or "\t"
-    if next(tab) then
-        str = str .. "\n"
-        for i, v in pairs(tab) do
-            str = str .. indent .. i .. " = " .. ToString(v, indent) .. ",\n"
+local ToReturn, TableToString
+do
+    local function ToString(v, indent)
+        if type(v) == "table" and v.Name and v.Type then
+            return ToReturn(v, indent)
+        elseif type(v) == "table" then
+            return TableToString(v, indent)
+        else
+            return tostring(v)
         end
     end
-    
-    return str .. stop
+
+    TableToString = function(tab, indent)
+        local str, stop = "{", (indent or "") .. "}"
+        indent = indent and indent .. "\t" or "\t"
+        if next(tab) then
+            str = str .. "\n"
+            for i, v in pairs(tab) do
+                str = str .. indent .. i .. " = " .. ToString(v, indent) .. ",\n"
+            end
+        end
+        
+        return str .. stop
+    end
+
+    ToReturn = function(self, indent)
+        return "(" .. self.Name .. ":"
+            .. (type(self.Value) == "table" and TableToString(self.Value or {}, indent) or self.Value)
+            .. ")"
+    end
 end
 
 function CheckDeep(tab1, tab2)
@@ -36,7 +44,7 @@ function CheckDeep(tab1, tab2)
             end
             local ret
             if value.Name or value.Type then
-                if value:Is(tab2[key]) then
+                if value.Name == tab2[key].Name then
                     if type(value.Value) == "table" then
                         ret = CheckDeep(value.Value, tab2[key].Value)
                     else
@@ -70,7 +78,7 @@ end
 local function test(program, outlexed, outparsed)
     
     return function (Lua)
-        local output, ran, out = true, false, nil
+        local output, out = true, false
         local lexed = Lua.Lex(program)
         if outlexed then
             local ret, newout = CheckDeep(outlexed, lexed)

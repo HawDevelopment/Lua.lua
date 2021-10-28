@@ -6,15 +6,14 @@
 
 
 local test = require("test.test")
-local Token = require("src.Generator.Util.Token")
 
 return {
     test("-- Hello", {}),
     
     test("1 + 1 -- Adds one and one", {
-        Token.new("IntegerLiteral", "1", "Number"),
-        Token.new("Operator", "+", "Operator"),
-        Token.new("IntegerLiteral", "1", "Number")
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+        { Name = "Operator", Value = "+", Type = "Operator" },
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" }
     }),
     
     test("--[[ Hello, this is multiline!\n Or at least it should be! ]]", {}),

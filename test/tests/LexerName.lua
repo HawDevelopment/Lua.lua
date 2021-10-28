@@ -5,34 +5,33 @@
 --]]
 
 local test = require("test.test")
-local Token = require("src.Generator.Util.Token")
 
 return {
     test("Name", {
-        Token.new("Name", "Name", "Identifier")
+        { Name = "Name", Value = "Name", Type = "Identifier" }
     }),
     
     test("local", {
-        Token.new("local", "local", "Identifier")
+        { Name = "local", Value = "local", Type = "Identifier" }
     }),
     
     test("print()", {
-        Token.new("print", "print", "Identifier"),
-        Token.new("Symbol", "(", "Symbol"),
-        Token.new("Symbol", ")", "Symbol")
+        { Name = "print", Value = "print", Type = "Identifier" },
+        { Name = "Symbol", Value = "(", Type = "Symbol" },
+        { Name = "Symbol", Value = ")", Type = "Symbol" }
     }),
     
     test("function()\n\t\nend", {
-        Token.new("function", "function", "Identifier"),
-        Token.new("Symbol", "(", "Symbol"),
-        Token.new("Symbol", ")", "Symbol"),
-        Token.new("end", "end", "Identifier"),
+        { Name = "function", Value = "function", Type = "Identifier" },
+        { Name = "Symbol", Value = "(", Type = "Symbol" },
+        { Name = "Symbol", Value = ")", Type = "Symbol" },
+        { Name = "end", Value = "end", Type = "Identifier" },
     }),
     
     test("print(tab)", {
-        Token.new("print", "print", "Identifier"),
-        Token.new("Symbol", "(", "Symbol"),
-        Token.new("tab", "tab", "Identifier"),
-        Token.new("Symbol", ")", "Symbol"),
+        { Name = "print", Value = "print", Type = "Identifier" },
+        { Name = "Symbol", Value = "(", Type = "Symbol" },
+        { Name = "tab", Value = "tab", Type = "Identifier" },
+        { Name = "Symbol", Value = ")", Type = "Symbol" },
     })
 }

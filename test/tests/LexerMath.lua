@@ -5,36 +5,35 @@
 --]]
 
 local test = require("test.test")
-local Token = require("src.Generator.Util.Token")
 
 return {
     test("1 + 1", {
-        Token.new("IntegerLiteral", "1", "Number"),
-        Token.new("Operator", "+", "Operator"),
-        Token.new("IntegerLiteral", "1", "Number")
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+        { Name = "Operator", Value = "+", Type = "Operator" },
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" }
     }),
     
     test("1 + 1 + 1", {
-        Token.new("IntegerLiteral", "1", "Number"),
-        Token.new("Operator", "+", "Operator"),
-        Token.new("IntegerLiteral", "1", "Number"),
-        Token.new("Operator", "+", "Operator"),
-        Token.new("IntegerLiteral", "1", "Number")
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+        { Name = "Operator", Value = "+", Type = "Operator" },
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+        { Name = "Operator", Value = "+", Type = "Operator" },
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" }
     }),
     
     test("1 * 1", {
-        Token.new("IntegerLiteral", "1", "Number"),
-        Token.new("Operator", "*", "Operator"),
-        Token.new("IntegerLiteral", "1", "Number")
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+        { Name = "Operator", Value = "*", Type = "Operator" },
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" }
     }),
     
     test("1 * (1 + 1)", {
-        Token.new("IntegerLiteral", "1", "Number"),
-        Token.new("Operator", "*", "Operator"),
-        Token.new("Symbol", "(", "Symbol"),
-        Token.new("IntegerLiteral", "1", "Number"),
-        Token.new("Operator", "+", "Operator"),
-        Token.new("IntegerLiteral", "1", "Number"),
-        Token.new("Symbol", ")", "Symbol")
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+        { Name = "Operator", Value = "*", Type = "Operator" },
+        { Name = "Symbol", Value = "(", Type = "Symbol" },
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+        { Name = "Operator", Value = "+", Type = "Operator" },
+        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+        { Name = "Symbol", Value = ")", Type = "Symbol" }
     }),
 }

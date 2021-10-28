@@ -5,33 +5,31 @@
 --]]
 
 local test = require("test.test")
-local Node = require("src.Generator.Util.Node")
-local Token = require("src.Generator.Util.Token")
 
 local function MakeCallStatement(base, args)
-    return Node.new("CallStatement", Node.new("CallExpression", {
+    return { Name = "CallStatement", Value = { "CallExpression", Value = {
         base = base,
         args = args,
-    }, "Expression"), "Statement")
+    }, Type = "Expression" }, Type = "Statement"}
 end
 
 local function MakeBinary(op, left, right)
-    return Node.new("BinaryExpression", {
+    return { Name = "BinaryExpression", Value = {
         op = op,
         left = left,
         right = right
-    }, "Expression")
+    }, Type = "Expression" }
 end
 
 return {
     test("print(1 + 1)", nil, {
         MakeCallStatement(
-            Node.new("Identifier", "print"),
+            { Name = "print", Value = "print", Type = "Identifier" },
             {
                 MakeBinary(
-                    Token.new("Operator", "+"),
-                    Token.new("IntegerLiteral", "1", "Number"),
-                    Token.new("IntegerLiteral", "1", "Number")
+                    { Name = "Operator", Value = "+", Type = "Operator" },
+                    { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+                    { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                 )
             }
         )
@@ -39,16 +37,16 @@ return {
     
     test("print(1 + 1 + 1)", nil, {
         MakeCallStatement(
-            Node.new("Identifier", "print"),
+            { Name = "print", Value = "print", Type = "Identifier" },
             {
                 MakeBinary(
-                    Token.new("Operator", "+"),
+                    { Name = "Operator", Value = "+", Type = "Operator" },
                     MakeBinary(
-                        Token.new("Operator", "+"),
-                        Token.new("IntegerLiteral", "1", "Number"),
-                        Token.new("IntegerLiteral", "1", "Number")
+                        { Name = "Operator", Value = "+", Type = "Operator" },
+                        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+                        { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                     ),
-                    Token.new("IntegerLiteral", "1", "Number")
+                    { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                 )
             }
         )
@@ -56,12 +54,12 @@ return {
     
     test("print(1 * 1)", nil, {
         MakeCallStatement(
-            Node.new("Identifier", "print"),
+            { Name = "print", Value = "print", Type = "Identifier" },
             {
                 MakeBinary(
-                    Token.new("Operator", "*"),
-                    Token.new("IntegerLiteral", "1", "Number"),
-                    Token.new("IntegerLiteral", "1", "Number")
+                    { Name = "Operator", Value = "*", Type = "Operator" },
+                    { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+                    { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                 )
             }
         )
@@ -69,15 +67,15 @@ return {
     
     test("print(1 * 1 ^ 1)", nil, {
         MakeCallStatement(
-            Node.new("Identifier", "print"),
+            { Name = "print", Value = "print", Type = "Identifier" },
             {
                 MakeBinary(
-                    Token.new("Operator", "*"),
-                    Token.new("IntegerLiteral", "1", "Number"),
+                    { Name = "Operator", Value = "*", Type = "Operator" },
+                    { Name = "IntegerLiteral", Value = "1", Type = "Number" },
                     MakeBinary(
-                        Token.new("Operator", "^"),
-                        Token.new("IntegerLiteral", "1", "Number"),
-                        Token.new("IntegerLiteral", "1", "Number")
+                        { Name = "Operator", Value = "^", Type = "Operator" },
+                        { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+                        { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                     )
                 )
             }
@@ -86,35 +84,35 @@ return {
     
     test("print(1 + 1 - 1 * 1 / 1 + (1 + 1) ^ 1)", nil, {
         MakeCallStatement(
-            Node.new("Identifier", "print"),
+            { Name = "print", Value = "print", Type = "Identifier" },
             {
                 MakeBinary(
-                    Token.new("Operator", "+"),
+                    { Name = "Operator", Value = "+", Type = "Operator" },
                     MakeBinary(
-                        Token.new("Operator", "-"),
+                        { Name = "Operator", Value = "-", Type = "Operator" },
                         MakeBinary(
-                            Token.new("Operator", "+"),
-                            Token.new("IntegerLiteral", "1", "Number"),
-                            Token.new("IntegerLiteral", "1", "Number")
+                            { Name = "Operator", Value = "+", Type = "Operator" },
+                            { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+                            { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                         ),
                         MakeBinary(
-                            Token.new("Operator", "/"),
+                            { Name = "Operator", Value = "/", Type = "Operator" },
                             MakeBinary(
-                                Token.new("Operator", "*"),
-                                Token.new("IntegerLiteral", "1", "Number"),
-                                Token.new("IntegerLiteral", "1", "Number")
+                                { Name = "Operator", Value = "*", Type = "Operator" },
+                                { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+                                { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                             ),
-                            Token.new("IntegerLiteral", "1", "Number")
+                            { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                         )
                     ),
                     MakeBinary(
-                        Token.new("Operator", "^"),
+                        { Name = "Operator", Value = "^", Type = "Operator" },
                         MakeBinary(
-                            Token.new("Operator", "+"),
-                            Token.new("IntegerLiteral", "1", "Number"),
-                            Token.new("IntegerLiteral", "1", "Number")
+                            { Name = "Operator", Value = "+", Type = "Operator" },
+                            { Name = "IntegerLiteral", Value = "1", Type = "Number" },
+                            { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                         ),
-                        Token.new("IntegerLiteral", "1", "Number")
+                        { Name = "IntegerLiteral", Value = "1", Type = "Number" }
                     )
                 )
             }

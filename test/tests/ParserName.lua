@@ -5,29 +5,27 @@
 --]]
 
 local test = require("test.test")
-local Token = require("src.Generator.Util.Token")
-local Node = require("src.Generator.Util.Node")
 
 local function MakeCallStatement(base, args)
-    return Node.new("CallStatement", Node.new("CallExpression", {
+    return { Name = "CallStatement", Value = { "CallExpression", Value = {
         base = base,
         args = args,
-    }, "Expression"), "Statement")
+    }, Type = "Expression" }, Type = "Statement"}
 end
 
 return {
     test("print()", nil, {
         MakeCallStatement(
-            Node.new("Identifier", "print"),
+            { Name = "print", Value = "print", Type = "Identifier" },
             {}
         )
     }),
     
     test("print(tab)", nil, {
         MakeCallStatement(
-            Node.new("Identifier", "print"),
+            { Name = "print", Value = "print", Type = "Identifier" },
             {
-                Node.new("Identifier", "tab", "Identifier")
+                { Name = "tab", Value = "tab", Type = "Identifier" }
             }
         )
     }),
