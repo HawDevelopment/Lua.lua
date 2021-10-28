@@ -4,13 +4,11 @@
     28/09/2021
 --]]
 
-local Token = require("src.Generator.Util.Token")
 local ToTable = require("src.Versions.Util.ToTable")
 
 local INDENTATION = ToTable("   ")
 local IDEN = ToTable("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_")
 local NUM = ToTable("0123456789")
-local NEW_LINE = Token("NewLine", "\n", "NewLine")
 local HEX = ToTable("0123456789abcdefABCDEF")
 
 local SYMBOLS = ToTable("+-*/^#%,(){}[]")
@@ -31,7 +29,6 @@ return {
     KEYWORDS = KEYWORDS,
     BOOLEAN = BOOLEAN,
     INDENTATION = INDENTATION,
-    NEW_LINE = NEW_LINE,
     NUM = NUM,
     IDEN = IDEN,
     HEX = HEX,

@@ -6,8 +6,6 @@
 
 local ALLOW_SELF_MATH = true -- Allow math to be alone (not being in a statement)
 
-local Node = require("src.Generator.Util.Node")
-
 local ParserClass = {}
 ParserClass.__index = ParserClass
 
@@ -16,7 +14,6 @@ function ParserClass.new(tokens, head)
     
     self.Tokens = tokens
     self.Head = head
-    self.Pos = head.Pos
     
     return self
 end
@@ -27,16 +24,16 @@ function ParserClass:ParseChunk()
     if self.Head:Next() then
         error("Unexpected token: " .. self.Head:Next().Type)
     end
-    return Node.new("Chunk", body, "Chunk", 0)
+    return { Name = "Chunk", Value = body, Type = "Chunk", Pos = { Line = 0, Colum = 0, Pos = 0 } }
 end
 
 local function IsBodyCloser(token)
     if not token then
         return true
-    elseif not (token:IsType("Keyword") or token:IsType("Identifier")) then
+    elseif not (token.Type == "Keyword" or token.Type == "Identifier") then
         return false
     end
-    if token:Is("else") or token:Is("elseif") or token:Is("end") or token:Is("until") then
+    if token.Name == "else" or token.Name == "elseif" or token.Name == "end" or token.Name == "until" then
         return true
     end
     return false
@@ -46,7 +43,7 @@ function ParserClass:ParseBody()
     local body, statement = {}, nil
     while not IsBodyCloser(self.Head:Current()) do
         local cur = self.Head:Current()
-        if cur and cur:Is("return") or cur:Is("break") then
+        if cur and (cur.Value == "return" or cur.Value == "break") and cur.Type == "Keyword" then
             table.insert(body, #body + 1, self:ParseStatement())
             break
         end
@@ -74,7 +71,7 @@ local KeywordToFunction = {
 function ParserClass:ParseStatement(cur)
     cur = cur or self.Head:Current()
     
-    if cur:IsType("Keyword") then
+    if cur.Type == "Keyword" then
         
         local index = KeywordToFunction[cur.Name]
         if index then
@@ -82,8 +79,8 @@ function ParserClass:ParseStatement(cur)
         else
             error("Unexpected token " .. cur:rep())
         end
-    elseif ALLOW_SELF_MATH and (cur:IsType("Number") or cur:IsType("Operator")) then
-        return self:GetExpression()
+    elseif ALLOW_SELF_MATH and (cur.Type == "Number" or cur.Type == "Operator") then
+        return self:GetExpression(0)
     end
     
     -- If its not a keyword it then it must be assignment or call
@@ -93,51 +90,51 @@ end
 -- Statements
 
 -- Function
-function ParserClass:ParseFunctionStatement()
+function ParserClass:ParseFunctionStatement(cur)
     local name = self:GetFunctionName(self.Head:GoNext())
-    return self:GetFunctionDefinition(name, false)
+    return self:GetFunctionDefinition(name, false, cur.Position)
 end
 
 -- Break
 function ParserClass:ParseBreakStatement(cur)
     self.Head:GoNext()
-    return Node.new("BreakStatement", cur.Value, "Statement", self.Pos.Counter - 1)
+    return { Name = "BreakStatement", Value = cur.Value, Type = "Statement", Position = cur.Position }
 end
 
 -- Do
-function ParserClass:ParseDoStatement()
+function ParserClass:ParseDoStatement(cur)
     self.Head:GoNext()
     local body = self:ParseBody()
     self.Head:Expect("end", "Expected end after do body!")
     
-    return Node.new("DoStatement", body, "Statement", self.Pos.Counter - 1)
+    return { Name = "DoStatement", Value = body, Type = "Statement", Position = cur.Position }
 end
 
 -- While
-function ParserClass:ParseWhileStatement()
+function ParserClass:ParseWhileStatement(cur)
     self.Head:GoNext()
-    local con = self:ParseExpectedExpression()
+    local con = self:GetExpectedExpression()
     self.Head:Expect("do", "Expected do after while condition!")
     local body = self:ParseBody()
     self.Head:Expect("end", "Expected end after while!")
     
-    return Node.new("WhileStatement", {
+    return { Name = "WhileStatement", Value = {
         con = con,
         body = body
-    }, "Statement", self.Pos.Counter - 1)
+    }, Type = "Statement", Position = cur.Position }
 end
 
 -- Repeat
-function ParserClass:ParseRepeatStatement()
+function ParserClass:ParseRepeatStatement(cur)
     self.Head:GoNext()
     local body = self:ParseBody()
     self.Head:Expect("until", "Expected until after repear!")
-    local con = self:ParseExpectedExpression()
+    local con = self:GetExpectedExpression()
     
-    return Node.new("RepearStatement", {
+    return { Name = "RepearStatement", Value = {
         con = con,
         body = body
-    }, "Statement", self.Pos.Counter - 1)
+    }, Type = "Statement", Position = cur.Position }
 end
 
 -- Return
@@ -145,10 +142,10 @@ function ParserClass:ParseReturnStatement(cur)
     cur = cur or self.Head:Current()
     
     local expressions = {}
-    if not cur:Is("end") then
+    if self.Head:Next().Name ~= "end" then
         self.Head:GoNext()
         while true do
-            local expression = self:ParseExpectedExpression()
+            local expression = self:GetExpectedExpression()
             if not expression then
                 error("Expected expression")
             end
@@ -160,56 +157,61 @@ function ParserClass:ParseReturnStatement(cur)
         end
     end
     
-    return Node.new("ReturnStatement", expressions, "Statement", self.Pos.Counter - 1)
+    return { Name = "ReturnStatement", Value = expressions, Type = "Statement", Position = cur.Position }
 end
 
-function ParserClass:ParseIfStatement()
+function ParserClass:ParseIfStatement(cur)
     local statements = {}
     
     -- Parse the if statement
     self.Head:GoNext()
-    local condition = self:ParseExpectedExpression()
+    local condition = self:GetExpectedExpression()
     self.Head:Expect("then", "Expected then after if condition!")
     local body = self:ParseBody()
     
-    table.insert(statements, #statements + 1, Node.new("IfStatement", {
+    table.insert(statements, #statements + 1, { Name = "IfStatement", Value = {
         condition = condition,
         body = body
-    }, "Statement", self.Pos.Counter - 1))
+    }, Type = "Statement", Position = cur.Position })
     
     -- Elseif
-    while self.Head:Consume("elseif") do
+    while true do
+        local token = self.Head:Current()
+        if token.Name ~= "elseif" then
+            break
+        end
         
-        condition = self:ParseExpectedExpression()
+        condition = self:GetExpectedExpression()
         self.Head:Expect("then", "Expected then after elseif condition!")
         body = self:ParseBody()
         
-        table.insert(statements, #statements + 1, Node.new("ElseIfStatement", {
+        table.insert(statements, #statements + 1, { Name = "ElseIfStatement", Value = {
             condition = condition,
             body = body
-        }, "Statement", self.Pos.Counter - 1))
+        }, Type = "Statement", Position = token.Position })
     end
     
     -- Else
-    if self.Head:Consume("else") then
+    local token = self.Head:Current()
+    if token.Name == "else" then
         
-        condition = self:ParseExpectedExpression()
+        condition = self:GetExpectedExpression()
         self.Head:Expect("then", "Expected then after elseif condition!")
         body = self:ParseBody()
         
-        table.insert(statements, #statements + 1, Node.new("ElseStatement", {
+        table.insert(statements, #statements + 1, { Name = "ElseStatement", Value = {
             condition = condition,
             body = body
-        }, "Statement", self.Pos.Counter - 1))
+        }, Type = "Statement", Position = token.Position })
     end
     self.Head:Expect("end", "Expected end after if!")
     
-    return Node.new("IfStatement", {
+    return { Name = "IfStatement", Value = {
         statements = statements
-    }, "Statement", self.Pos.Counter - 1)
+    }, "Statement", Position = cur.Position }
 end
 
-function ParserClass:ParseForStatement()
+function ParserClass:ParseForStatement(cur)
     local var = self:GetIdentifier(self.Head:GoNext())
     self.Head:GoNext()
     
@@ -217,13 +219,13 @@ function ParserClass:ParseForStatement()
     if self.Head:Consume("=") then
         
         local start, stop, iter
-        start = self:ParseExpectedExpression()
+        start = self:GetExpectedExpression()
         self.Head:Expect(",", "Expected , after for start!")
         
-        stop = self:ParseExpectedExpression()
+        stop = self:GetExpectedExpression()
         self.Head:GoNext()
         if self.Head:Consume(",") then
-            iter = self:ParseExpectedExpression()
+            iter = self:GetExpectedExpression()
             self.Head:GoNext()
         end
         
@@ -231,13 +233,13 @@ function ParserClass:ParseForStatement()
         local body = self:ParseBody()
         self.Head:GoNextAndExpect("end", "Expected end after for!")
         
-        return Node.new("NumericForStatement", {
+        return { Name = "NumericForStatement", Value = {
             var = var,
             start = start,
             stop = stop,
             iter = iter,
             body = body
-        }, "Statement", self.Pos.Counter - 1)
+        }, Type = "Statement", Position = cur.Position }
     else
         -- Other type
         
@@ -249,7 +251,7 @@ function ParserClass:ParseForStatement()
         self.Head:Expect("in", "Expected in after for!")
         local iters = {}
         while true do
-            table.insert(iters, nil, self:ParseExpectedExpression())
+            table.insert(iters, nil, self:GetExpectedExpression())
             self.Head:GoNext()
             if not self.Head:Consume(",") then
                 break
@@ -259,19 +261,19 @@ function ParserClass:ParseForStatement()
         local body = self:ParseBody()
         self.Head:GoNextAndExpect("end", "Expected end after for!")
         
-        return Node.new("GenericForStatement", {
+        return { Name = "GenericForStatement", Value = {
             vars = vars,
             iters = iters,
             body = body
-        }, "Statement", self.Pos.Counter - 1)
+        }, Type = "Statement", Position = cur.Position }
     end
 end
 
 -- Local
-function ParserClass:ParseLocalStatement()
+function ParserClass:ParseLocalStatement(cur)
     local name = self.Head:GoNext()
     
-    if name:IsType("Identifier") then
+    if name.Type == "Identifier" then
         -- Typical local
         
         local vars, init = { name }, nil
@@ -282,20 +284,20 @@ function ParserClass:ParseLocalStatement()
         
         -- Init values
         if self.Head:Consume("=") then
-            init = { self:ParseExpectedExpression() }
+            init = { self:GetExpectedExpression() }
             while self.Head:Consume(",") do
-                table.insert(init, #init + 1, self:ParseExpectedExpression())
+                table.insert(init, #init + 1, self:GetExpectedExpression())
             end
         end
         
-        return Node.new("LocalStatement", {
+        return { Name = "LocalStatement", {
             idens = vars,
             inits = init
-        }, "Statement", self.Pos.Counter - 1)
-    elseif name:Is("function") then
+        }, Type = "Statement", Position = cur.Position }
+    elseif name.Name == "function" then
         -- Local function
         name = self:GetIdentifier(self.Head:GoNext())
-        return self:GetFunctionDefinition(name, true)
+        return self:GetFunctionDefinition(name, true, cur.Position)
     else
         error("Expected identifier or function after local!")
     end
@@ -309,20 +311,20 @@ local AssignmentOrCallStatementTab = {
     ["{"] = 2,
 }
 
-function ParserClass:ParseAssignmentOrCallStatement(cur)
-    cur = cur or self.Head:Current()
+function ParserClass:ParseAssignmentOrCallStatement(start)
+    local cur = start or self.Head:Current()
     
     -- Get all identifiers or expressions
     local names, base, isassignment = {}, nil, nil
     while true do
         
         -- Find identifier
-        if cur:IsType("Identifier") then
+        if cur.Type == "Identifier" then
             base = self:GetIdentifier()
             isassignment = true -- We check if it could be a call later
         elseif cur.Value == "(" then
             self.Head:GoNext()
-            base = self:ParseExpectedExpression()
+            base = self:GetExpectedExpression()
             self.Head:Expect(")", "Expected ) after expression!")
             isassignment = nil -- Can only be a function call
         else
@@ -334,7 +336,7 @@ function ParserClass:ParseAssignmentOrCallStatement(cur)
             cur = self.Head:Current()
             if not cur then
                 break
-            elseif cur:IsType("Symbol") then
+            elseif cur.Type == "Symbol" then
                 
                 local val = AssignmentOrCallStatementTab[cur.Value]
                 if val == 1 then
@@ -344,7 +346,7 @@ function ParserClass:ParseAssignmentOrCallStatement(cur)
                 else
                     break
                 end
-            elseif cur:IsType("String") then
+            elseif cur.Type == "String" then
                 isassignment = nil -- String cant be used as an assignment name
             else
                 break
@@ -364,7 +366,7 @@ function ParserClass:ParseAssignmentOrCallStatement(cur)
     
     -- Call statement
     if #names == 1 and isassignment == nil then
-        return Node.new("CallStatement", names[1], "Statement", self.Pos.Counter - 1)
+        return { Name = "CallStatement", Value = names[1], Type = "Statement", Position = start.Position }
     elseif not isassignment then
         -- We found to names but it is not a call?
         return error("Unexpected token")
@@ -375,16 +377,16 @@ function ParserClass:ParseAssignmentOrCallStatement(cur)
     
     local expressions = {}
     while true do
-        table.insert(expressions, #expressions + 1, self:ParseExpectedExpression())
+        table.insert(expressions, #expressions + 1, self:GetExpectedExpression())
         if not self.Head:Consume(",") then
             break
         end
     end
     
-    return Node.new("AssignmentStatement", {
+    return { "AssignmentStatement", Value = {
         idens = names,
         values = expressions
-    }, "Statement", self.Pos.Counter - 1)
+    }, Type = "Statement", Position = start.Position }
 end
 
 -- UTIL
@@ -392,15 +394,16 @@ end
 -- Get identifier
 function ParserClass:GetIdentifier(cur)
     cur = cur or self.Head:Current()
-    if cur:IsType("Identifier") then
+    if cur.Type == "Identifier" then
         self.Head:GoNext()
-        return Node.new("Identifier", cur.Value, "Identifier", self.Pos.Counter - 1)
+        return cur
     end
     error("Expected identifier!")
 end
 
 -- Get function body
-function ParserClass:GetFunctionDefinition(name, islocal)
+function ParserClass:GetFunctionDefinition(name, islocal, pos)
+    pos = pos or error("Expected a position!")
     if islocal == nil then
         islocal = false
     end
@@ -412,10 +415,10 @@ function ParserClass:GetFunctionDefinition(name, islocal)
         -- There are some params
         while true do
             local cur = self.Head:Current()
-            if cur:Is("VarArgLiteral") then
+            if cur.Name == "VarArgLiteral" then
                 table.insert(params, #params + 1, cur)
                 break -- Vararg is the last param
-            elseif cur:IsType("Identifier") and self.Head:Next() then
+            elseif cur.Type == "Identifier" and self.Head:Next() then
                 table.insert(params, #params + 1, self:GetIdentifier())
                 if not self.Head:Consume(",") then
                     break
@@ -430,21 +433,21 @@ function ParserClass:GetFunctionDefinition(name, islocal)
     local body = self:ParseBody()
     self.Head:Expect("end", "Expected end after function body!")
     
-    return Node.new("FunctionStatement", {
+    return { Name = "FunctionStatement", Value = {
         name = name,
         params = params,
         body = body,
         islocal = islocal
-    }, "Statement", self.Pos.Counter - 1)
+    }, Type = "Statement", Position = pos }
 end
 
 -- Get function name
 local function CreateMembership(base, index, name)
-    return Node.new("MembershipExpression", {
+    return { Name = "MembershipExpression", Value = {
         base = base,
         index = index,
         name = name
-    }, "Expression")
+    }, Type = "Expression", Position = base.Position }
     
 end
 
@@ -462,62 +465,58 @@ function ParserClass:GetFunctionName(cur)
     return cur
 end
 
-function ParserClass:GetTableContructor()
+function ParserClass:GetTableContructor(cur)
     self.Head:GoNext() -- We expect that previous token was "{"
     local values, value, key = {}, nil, nil
     
     while true do
-        local cur = self.Head:Current()
-        if cur:IsType("Symbol") and cur.Value == "[" then
+        local token = self.Head:Current()
+        if token:IsType("Symbol") and token.Value == "[" then
             self.Head:GoNext()
-            key = self:ParseExpectedExpression()
+            key = self:GetExpectedExpression()
             self.Head:Expect("]", "Expected ] after table key!")
             self.Head:Expected("=", "Expected = after table key!")
-            value = self:ParseExpectedExpression()
-            table.insert(values, #values + 1, Node.new("TableConstructorPair", {
+            value = self:GetExpectedExpression()
+            table.insert(values, #values + 1, { Name = "TableConstructorPair", Value = {
                 key = key,
                 value = value
-            }, "TableConstructor"))
-        elseif cur:IsType("Indentifier") then
+            }, Type = "TableConstructor", Position = token.Position })
+        elseif token:IsType("Indentifier") then
             
             if self.Head:Next().Value == "=" then
-                key = self:GetIdentifier(cur)
+                key = self:GetIdentifier(token)
                 self.Head:GoNext() -- We known that this is "="
-                value = self:ParseExpectedExpression()
-                table.insert(values, #values + 1, Node.new("TableConstructorPair", {
+                value = self:GetExpectedExpression()
+                table.insert(values, #values + 1, { Name = "TableConstructorPair", Value = {
                     key = key,
                     value = value
-                }, "TableConstructor"))
+                }, Type = "TableConstructor", Position = token.Position })
             else
-                value = self:ParseExpectedExpression()
-                table.insert(values, #values + 1, Node.new("TableConstructorValue", value, "TableConstructor"))
+                value = self:GetExpectedExpression()
+                table.insert(values, #values + 1, { Name = "TableConstructorValue", Value = value, Type = "TableConstructor", Position = token.Position })
             end
         else
-            value = self:GetExpression()
+            value = self:GetExpression(0)
             if not value then
                 break
             end
-            table.insert(values, #values + 1, Node.new("TableConstructorValue", value, "TableConstructor"))
+            table.insert(values, #values + 1, { Name = "TableConstructorValue", Value = value, Type = "TableConstructor", Position = token.Position })
         end
         
         -- Seperator
-        cur = self.Head:Current()
-        if cur.Value == "," or cur == ";" then
+        token = self.Head:Current()
+        if token.Value == "," or token == ";" then
             self.Head:GoNext()
         else
             break
         end
     end
     self.Head:Expect("}", "Expected } after table constructor!")
-    return Node.new("TableConstructor", values, "Expression")
+    return { Name = "TableConstructor", Value = values, Type = "Expression", Position = cur.Position }
 end
 
-function ParserClass:GetExpression()
-    return self:GetSubExpression(0)
-end
-
-function ParserClass:ParseExpectedExpression()
-    local expr = self:GetExpression()
+function ParserClass:GetExpectedExpression()
+    local expr = self:GetExpression(0)
     if not expr then
         error("Expected expression!")
     end
@@ -552,21 +551,21 @@ local function IsUnary(name)
 end
 
 -- Sub expression
-function ParserClass:GetSubExpression(minprec)
+function ParserClass:GetExpression(minprec)
     local op, expr = self.Head:Current(), nil
     
     if IsUnary(op.Value) then
         -- Unary expr
         self.Head:GoNext()
         -- 7 is the precedence of unary
-        local subexpr = self:GetSubExpression(7)
+        local subexpr = self:GetExpression(7)
         if not subexpr then
             error("Expected expression after unary operator!")
         end
-        expr = Node.new("UnaryExpression", {
+        expr = { Name = "UnaryExpression", Value = {
             op = op,
             expr = subexpr
-        }, "Expression")
+        }, Type = "Expression", Position = op.Position }
     else
         -- Primary
         expr = self:GetLiteral()
@@ -596,18 +595,17 @@ function ParserClass:GetSubExpression(minprec)
         end
         self.Head:GoNext()
         
-        local subexpr = self:GetSubExpression(precedence)
+        local subexpr = self:GetExpression(precedence)
         if not subexpr then
             self.Head:GoNext()
             break
         end
-        expr = Node.new("BinaryExpression", {
+        expr = { Name = "BinaryExpression", Value = {
             op = op,
             left = expr,
             right = subexpr
-        }, "Expression")
+        }, Type = "Expression", Position = expr.Position }
     end
-    
     return expr
 end
 
@@ -617,13 +615,13 @@ function ParserClass:GetPrefixExpressionBase(base, cur)
         return nil
     end
     
-    if cur:IsType("Symbol") then
+    if cur.Type == "Symbol" then
         if cur.Value == "." then
             self.Head:GoNext()
             return CreateMembership(base, ".", self:GetIdentifier())
         elseif cur.Value == "[" then
             self.Head:GoNext()
-            local index = self:ParseExpectedExpression()
+            local index = self:GetExpectedExpression()
             self.Head:Expect("]", "Expected ] after table index!")
             return CreateMembership(base, "[", index)
         elseif cur.Value == ":" then
@@ -635,7 +633,7 @@ function ParserClass:GetPrefixExpressionBase(base, cur)
         elseif cur.Value == "(" or cur.Value == "{" then
             return self:GetCallExpression(base)
         end
-    elseif cur:IsType("String") then
+    elseif cur.Type == "String" then
         return self:GetCallExpression(base)
     end
 end
@@ -644,11 +642,11 @@ function ParserClass:GetPrefixExpression(cur)
     cur = cur or self.Head:Current()
     local name, base
     
-    if cur:IsType("Identifier") then
+    if cur.Type == "Identifier" then
         name = cur.Value
         base = self:GetIdentifier(cur)
     elseif self.Head:Consume("(") then
-        base = self:ParseExpectedExpression()
+        base = self:GetExpectedExpression()
         self.Head:Expect(")", "Expected ) after expression!")
     else
         return nil
@@ -669,42 +667,41 @@ end
 function ParserClass:GetCallExpression(base, cur)
     cur = cur or self.Head:Current()
     
-    if cur:IsType("Symbol") then
+    if cur.Type == "Symbol" then
         
         if cur.Value == "(" then
             local exprs = {}
             
-            self.Head:GoNext()
-            if self.Head:Current().Value ~= ")" then
-                local expr = self:GetExpression()
+            if self.Head:GoNext() and self.Head:Current().Value ~= ")" then
+                local expr = self:GetExpression(0)
                 if expr then
                     table.insert(exprs, #exprs + 1, expr)
                 end
                 
                 while self.Head:Consume(",") do
-                    table.insert(exprs, #exprs + 1, self:ParseExpectedExpression())
+                    table.insert(exprs, #exprs + 1, self:GetExpectedExpression())
                 end
             end
             
             self.Head:Expect(")", "Expected ) after expression!")
-            return Node.new("CallExpression", {
+            return { Name = "CallExpression", Value = {
                 base = base,
                 args = exprs
-            }, "Expression")
+            }, Type = "Expression", Position = base.Position }
         elseif cur.Value == "{" then
             self.Head:GoNext()
             local tab = self:ParseTableConstructor()
-            return Node.new("TableCallExpression", {
+            return { Name = "TableCallExpression", Value = {
                 base = base,
                 arg = tab
-            }, "Expression")
+            }, Type = "Expression", Position = base.Position }
         end
     
-    elseif cur:IsType("String") then
-        return Node.new("StringCallExpression", {
+    elseif cur.Type == "String" then
+        return { Name = "StringCallExpression", Value = {
             base = base,
             arg = self:GetLiteral(cur),
-        }, "Expression")
+        }, Type = "Expression", Position = base.Position }
     end
     error("Unexpected function argument")
 end
@@ -712,10 +709,10 @@ end
 function ParserClass:GetLiteral(cur)
     cur = cur or self.Head:Current()
     
-    if cur:IsType("String") or cur:IsType("Number") or cur:IsType("Boolean") or cur:Is("VarArgLiteral") or cur:Is("NilLiteral") then
+    if cur.Type == "String" or cur.Type == "Number" or cur.Type == "Boolean" or cur.Name == "VarArgLiteral" or cur.Name == "NilLiteral" then
         self.Head:GoNext()
         return cur
-    elseif cur:Is("function") then
+    elseif cur.Name == "function" then
         self.Head:GoNext()
         return self:GetFunctionDefinition(nil, false)
     elseif self.Head:Consume("{") then

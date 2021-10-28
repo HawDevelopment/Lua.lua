@@ -19,15 +19,49 @@ local USAGE = [[
         sim     Takes input and interprets it immediately
 ]]
 
-local function PrintTokens(tokens)
-    if tokens.Name and tokens.Name == "Chunk" then
-        print(tokens:rep())
-    else
-        for _, tok in pairs(tokens) do
-            print(tok:rep())
+local PrintTokens
+do
+    local TableToString, ToReturn
+    local function ToString(v, indent)
+        if type(v) == "table" and v.Name and v.Type then
+            return ToReturn(v, indent)
+        elseif type(v) == "table" then
+            return TableToString(v, indent)
+        else
+            return tostring(v)
+        end
+    end
+
+    TableToString = function(tab, indent)
+        local str, stop = "{", (indent or "") .. "}"
+        indent = indent and indent .. "\t" or "\t"
+        if next(tab) then
+            str = str .. "\n"
+            for i, v in pairs(tab) do
+                str = str .. indent .. i .. " = " .. ToString(v, indent) .. ",\n"
+            end
+        end
+        
+        return str .. stop
+    end
+
+    ToReturn = function(self, indent)
+        return "(" .. self.Name .. ":"
+            .. (type(self.Value) == "table" and TableToString(self.Value or {}, indent) or self.Value)
+            .. ")"
+    end
+
+    function PrintTokens(tokens)
+        if tokens.Name and tokens.Name == "Chunk" then
+            PrintTokens(tokens.Value)
+        else
+            for _, tok in pairs(tokens) do
+                print(ToReturn(tok))
+            end
         end
     end
 end
+
 local function ValueInTable(tab, value)
     for i, val in pairs(tab) do
         if val == value then
@@ -62,8 +96,10 @@ function RunSource(source, settings)
         print("Lexing took " .. time .. "s")
         time, ast = TakeTime(Lua.Parse, tokens)
         print("Parsing took " .. time .. "s")
-        time, visited = TakeTime(Lua.Visit, ast)
-        print("Visiting took " .. time .. "s")
+        if settings.Compile then
+            time, visited = TakeTime(Lua.Visit, ast)
+            print("Visiting took " .. time .. "s")
+        end
         alltime = os.clock() - alltime
         print("Total time " .. alltime .. "s")
     else
@@ -149,7 +185,6 @@ function RunCommand()
                 return
             end
             inp = inp:gsub("\\n", "\n")
-            print(inp)
             
             local lexed, parsed, visited = RunSource(inp, Settings)
             Run(lexed, parsed, visited, Settings)

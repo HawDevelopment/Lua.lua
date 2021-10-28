@@ -4,9 +4,7 @@
     21/10/2021
 --]]
 
-local LexerHead = require("src.Generator.Util.LexerHead")
-local Position = require("src.Generator.Util.Position")
-local Node = require("src.Generator.Util.Node")
+local TableHead = require("src.Generator.Util.TableHead")
 
 local VisitorClass = {}
 VisitorClass.__index = VisitorClass
@@ -16,8 +14,7 @@ function VisitorClass.new(ast, head)
     
     self.Ast = ast
     self.Out = {}
-    self.Pos = head and head.Pos or Position.new(0)
-    self.Head = head or LexerHead.new(ast.Value, self.Pos)
+    self.Head = head or TableHead.new(ast.Value)
     
     return self
 end
@@ -50,7 +47,7 @@ function VisitorClass:FunctionStatement(cur)
     for _, value in pairs(cur.body) do
         self:Walk(value)
     end
-    table.insert(self.Out, Node.new("FunctionStatementEnd", cur.name, "Statement"))
+    table.insert(self.Out, { Name = "FunctionStatementEnd", Value = cur.name, Type = "Statement", Position = cur.Position })
 end
 
 -- TODO: Add suport for multiple inits
@@ -58,9 +55,9 @@ function VisitorClass:LocalStatement(cur)
     if #cur.Value.inits > 0 then
         self:Walk(cur.Value.inits[1])
     else
-        self:Number(Node.new("IntegerLiteral", 0, "Number"))
+        self:Number({ Name = "IntegerLiteral", Value = 0, Type = "Number", Position = cur.Position })
     end
-    table.insert(self.Out, Node.new("LocalStatement", "a", "Statement"))
+    table.insert(self.Out, { Name = "LocalStatement", Value = cur.idens[1], Type = "Statement", Position = cur.Position })
 end
 
 local NameToFunction = {

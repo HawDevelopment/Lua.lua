@@ -4,8 +4,7 @@
     21/10/2021
 --]]
 
-local LexerHead = require("src.Generator.Util.LexerHead")
-local Position = require("src.Generator.Util.Position")
+local TableHead = require("src.Generator.Util.TableHead")
 
 local StartAssembly = "section .text\nglobal _main\nextern _printf\n\n_main:"
 local FunctionsAssembly = ""
@@ -21,8 +20,7 @@ function CompilerClass.new(visited, head, version)
     self.Start = StartAssembly
     self.Function = FunctionsAssembly
     self.End = EndAssembly
-    self.Pos = head and head.Pos or Position.new(0)
-    self.Head = head or LexerHead.new(visited, self.Pos)
+    self.Head = head or TableHead.new(visited)
     self.Version = version
     
     return self
@@ -117,7 +115,7 @@ do
 
     -- TODO: Add suport for more ops
     function CompilerClass:CompileBinary(cur)
-        local op, pos = cur.Value.op.Value, self.Pos.Counter
+        local op, pos = cur.Value.op.Value, self.Head.Pos
         local str = OpToString[op] or error("Not a valid operator! " .. op)
 
         if self.Version.LOGICAL_OPERATORS[op] then
