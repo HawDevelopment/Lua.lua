@@ -142,7 +142,6 @@ do
     local Float1 = "[%d]*[%.][%d]+" .. EXPONENT
     local Float2 = "[%d]+" .. EXPONENT
     function LexerClass:GetFloat()
-        print("Float:")
         local value = string.match(self.Source, Float1, self.Pos.Counter) or
             string.match(self.Source, Float2, self.Pos.Counter)
         return value

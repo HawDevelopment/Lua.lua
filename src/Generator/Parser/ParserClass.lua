@@ -78,7 +78,6 @@ function ParserClass:ParseStatement(cur)
         
         local index = KeywordToFunction[cur.Name]
         if index then
-            print(index)
             return self[index](self, cur)
         else
             error("Unexpected token " .. cur:rep())
