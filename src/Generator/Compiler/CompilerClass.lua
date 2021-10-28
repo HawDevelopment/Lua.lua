@@ -94,9 +94,9 @@ do
     cdq
     idiv ecx
     mov eax, edx]],
-    ["=="] = "je", ["~="] = "jne",
-    [">"] = "jg", [">="] = "jge",
-    ["<"] = "jl", ["<="] = "jle",
+    ["=="] = "cmove", ["~="] = "cmovne",
+    [">"] = "cmovg", [">="] = "cmovge",
+    ["<"] = "cmovl", ["<="] = "cmovle",
     
         ["or"] = [[
     cmp eax, 0
@@ -110,8 +110,7 @@ do
     }
     local LogicalString = "_%d:\n%s\n\tcmp eax, 0\n\tsetne al\n\tjmp _end%d"
 
-    local EqualString = "\tcmp eax, ecx\n\t%s _%d\n\tmov eax, 0\n\tjmp _end%d"
-    local EqualStringFunc = "_%d:\n\tmov eax, 1\n\tjmp _end%d"
+    local EqualString = "\tmov ecx, 0\n\tmov edx, 1\n\tcmp ebx, eax\n\t%s ecx, edx\n\tmov eax, ecx"
 
     -- TODO: Add suport for more ops
     function CompilerClass:CompileBinary(cur)
@@ -128,9 +127,7 @@ do
         if self.Version.EQUALITY_OPERATORS[op] or self.Version.COMPARISON_OPERATORS[op] then
             -- ==, ~=, >, >=, <, <=
             str = EqualString:format(str, pos, pos)
-            self:AddToFunction(EqualStringFunc:format(pos, pos), "")
-            
-            return string.format("\tpush eax\n%s\n\tpop ecx\n", self:Walk(self.Head:GoNext())) .. str .. "\n_end" .. pos .. ":\n"
+            return string.format("\tpush eax\n%s\n\tpop ebx\n", self:Walk(self.Head:GoNext())) .. str
         end
         
         -- Binary
