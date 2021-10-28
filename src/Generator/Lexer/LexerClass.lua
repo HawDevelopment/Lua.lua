@@ -10,8 +10,8 @@ local LexerClass = {}
 LexerClass.__index = LexerClass
 
 local HEX_NUMBER = "[%da-fA-F]"
-local EXPONENT = "[eE][%+%-]?%d+"
-local HEX_EXPONENT = "[pP][%+%-]?%d+"
+local EXPONENT = "[eE]?[%+%-]?%d*"
+local HEX_EXPONENT = "[pP][%+%-]?%d*"
 
 function LexerClass.new(source, head, version)
     local self = setmetatable({}, LexerClass)
@@ -136,52 +136,54 @@ end
 do
     function LexerClass:GetInt()
         local value = string.match(self.Source, "[%d]+", self.Pos.Counter)
-        return value, #value - 1
+        return value
     end
     
     local Float1 = "[%d]*[%.][%d]+" .. EXPONENT
     local Float2 = "[%d]+" .. EXPONENT
     function LexerClass:GetFloat()
+        print("Float:")
         local value = string.match(self.Source, Float1, self.Pos.Counter) or
             string.match(self.Source, Float2, self.Pos.Counter)
-        return value, #value - 1
+        return value
     end
     
     local Hex = "0[xX]%.?" .. HEX_NUMBER .. "*%.?" .. HEX_NUMBER .. "*" .. HEX_EXPONENT
     function LexerClass:GetHex()
         local value = string.match(self.Source, Hex, self.Pos.Counter)
-        return value, #value - 1
+        return value
     end
     
     function LexerClass:LexNumber()
         local cur, next = self.Head:Current(), self.Head:Next()
         if cur == "0" and next == "x" or next == "X" then
             -- Hexadecimal
-            local value, length = self:GetHex()
+            local value = self:GetHex()
             if value then
-                self.Pos.Counter = self.Pos.Counter + length
+                self.Pos.Counter = self.Pos.Counter + #value - 1
                 self.Tokens[#self.Tokens + 1] = Token.new("HexadecimalLiteral", value, "Number", self.Pos.Counter)
+                return
             else
                 error("Invalid hexadecimal")
             end
         end
         
         -- Decimal
-        local value, length = self:GetInt()
-        if value then
-            -- Integer
-            self.Pos.Counter = self.Pos.Counter + length
+        local value = self:GetInt()
+        local length = self.Pos.Counter + #value
+        if value and self.Source:sub(length, length) == "." then
+            -- Float
+            value = self:GetFloat()
+            self.Pos.Counter = self.Pos.Counter + #value - 1
+            self.Tokens[#self.Tokens+1] = Token.new("FloatLiteral", value, "Number", self.Pos.Counter)
+        elseif value then
+            -- Int
+            self.Pos.Counter = length - 1
             self.Tokens[#self.Tokens+1] = Token.new("IntegerLiteral", value, "Number", self.Pos.Counter)
         else
-            -- Float
-            value, length = self:GetFloat()
-            if value and value ~= "" then
-                self.Pos.Counter = self.Pos.Counter + length
-                self.Tokens[#self.Tokens+1] = Token.new("FloatLiteral", value, "Number", self.Pos.Counter)
-            else
-                error("Invalid number")
-            end
+            error("Invalid number")
         end
+        
     end
 end
 

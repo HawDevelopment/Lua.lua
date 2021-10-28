@@ -78,6 +78,7 @@ function ParserClass:ParseStatement(cur)
         
         local index = KeywordToFunction[cur.Name]
         if index then
+            print(index)
             return self[index](self, cur)
         else
             error("Unexpected token " .. cur:rep())
@@ -91,6 +92,12 @@ function ParserClass:ParseStatement(cur)
 end
 
 -- Statements
+
+-- Function
+function ParserClass:ParseFunctionStatement()
+    local name = self:GetFunctionName(self.Head:GoNext())
+    return self:GetFunctionDefinition(name, false)
+end
 
 -- Break
 function ParserClass:ParseBreakStatement(cur)
@@ -607,6 +614,9 @@ end
 
 function ParserClass:GetPrefixExpressionBase(base, cur)
     cur = cur or self.Head:Current()
+    if not cur then
+        return nil
+    end
     
     if cur:IsType("Symbol") then
         if cur.Value == "." then

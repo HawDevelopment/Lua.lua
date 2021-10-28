@@ -7,6 +7,10 @@
 local Lua = require("src.service")
 local unpack = unpack or table.unpack
 
+-- (AUTO_COMPILE only supports windows for now!)
+local AUTO_COMPILE = true -- Allow Lua.lua to run nasm and gcc automatically
+local AUTO_RUN = true -- Allow Lua.lua to run the compiled binary automatically
+
 local USAGE = [[
     USAGE: Lua.lua [SUBCOMMANDS] [FILES]
     
@@ -25,12 +29,20 @@ local function PrintTokens(tokens)
     end
 end
 local function ValueInTable(tab, value)
-    for _, val in pairs(tab) do
+    for i, val in pairs(tab) do
         if val == value then
             return true
         end
     end
     return false
+end
+local function FindInTable(tab, value)
+    for i, val in pairs(tab) do
+        if val == value then
+            return i
+        end
+    end
+    return nil
 end
 
 local function TakeTime(func, ...)
@@ -39,22 +51,63 @@ local function TakeTime(func, ...)
     return os.clock() - start, unpack(arg)
 end
 
-function RunSource(source, debug)
-    local ast, tokens
-    if debug then
+PRINT_VISIT = nil
+
+function RunSource(source, settings)
+    local ast, tokens, visited
+    if settings.Debug then
         -- Taketime
         local alltime, time = os.clock(), nil
         time, tokens = TakeTime(Lua.Lex, source)
         print("Lexing took " .. time .. "s")
         time, ast = TakeTime(Lua.Parse, tokens)
         print("Parsing took " .. time .. "s")
+        time, visited = TakeTime(Lua.Visit, ast)
+        print("Visiting took " .. time .. "s")
         alltime = os.clock() - alltime
         print("Total time " .. alltime .. "s")
     else
         tokens = Lua.Lex(source)
         ast = Lua.Parse(tokens)
+        visited = Lua.Visit(ast)
     end
-    return tokens, ast
+    
+    return tokens, ast, visited
+end
+
+local function Run(lexed, parsed, visited, settings)
+    if settings.Print then
+        if lexed then
+            print("Lexed: \n")
+            PrintTokens(lexed)
+        end
+        if parsed then
+            print("Parsed: \n")
+            PrintTokens(parsed)
+        end
+    end
+    if visited and settings.PrintVisited then
+        print("Visited: \n")
+        PrintTokens(visited)
+    end
+    if settings.Compile then
+        local out = Lua.Compile(visited)
+        if settings.Output then
+            local file = io.open(settings.Output .. ".asm", "w")
+            file:write(out)
+            file:close()
+            if AUTO_COMPILE then
+                
+                os.execute("nasm -f win32 " .. settings.Output .. ".asm")
+                os.execute("gcc -m32 -o " .. settings.Output .. " " .. settings.Output .. ".obj")
+                if AUTO_RUN then
+                    os.execute(settings.Output)
+                end
+            end
+        else
+            print(out)
+        end
+    end
 end
 
 
@@ -64,41 +117,30 @@ function RunCommand()
         return
     end
     
-    -- Parse the command
-    local opt, args = {}, {}
-    for _, value in pairs(arg) do
-        if string.match(value, "^%-%-") ~= nil then
-            opt[#opt+1] = value:sub(3)
-        else
-            args[#args+1] = value
-        end
+    local Settings = {
+        PrintVisited = ValueInTable(arg, "--visit"),
+        Debug = ValueInTable(arg, "--debug") or ValueInTable(arg, "-d"),
+        Print = ValueInTable(arg, "--print") or ValueInTable(arg, "-p"),
+        Compile = ValueInTable(arg, "--com") or ValueInTable(arg, "-c"),
+    }
+    -- Output
+    local outpos = FindInTable(arg, "--out") or FindInTable(arg, "--output") or FindInTable(arg, "-o")
+    if outpos then
+        Settings.Output = arg[outpos + 1]
     end
     
-    DEBUG = ValueInTable(opt, "debug")
-    PRINT_ARG = ValueInTable(opt, "print")
-    
-    if args[1] == "run" then
-        local file = io.open(args[2], "r")
+    if arg[#arg - 1] == "run" then
+        local file = io.open(arg[#arg], "r")
         if not file then
             return print("File not found")
         end
         
         local source = file:read("*a")
         file:close()
-        local lexed, parsed = RunSource(source, DEBUG)
+        local lexed, parsed, visited = RunSource(source, Settings)
+        Run(lexed, parsed, visited, Settings)
         
-        if PRINT_ARG then
-            if type(lexed) == "table" then
-                print("Lexed tokens:")
-                PrintTokens(lexed)
-            end
-            if type(parsed) == "table" then
-                print("Parsed tokens:")
-                PrintTokens(parsed)
-            end
-        end
-        
-    elseif args[1] == "sim" then
+    elseif arg[#arg] == "sim" then
         
         while true do
             io.write("> ")
@@ -106,19 +148,11 @@ function RunCommand()
             if inp == "exit" or not inp then
                 return
             end
+            inp = inp:gsub("\\n", "\n")
+            print(inp)
             
-            local lexed, parsed = RunSource(inp, DEBUG)
-            
-            if PRINT_ARG then
-                if type(lexed) == "table" then
-                    print("Lexed tokens:")
-                    PrintTokens(lexed)
-                end
-                if type(parsed) == "table" then
-                    print("Parsed tokens:")
-                    PrintTokens(parsed)
-                end
-            end
+            local lexed, parsed, visited = RunSource(inp, Settings)
+            Run(lexed, parsed, visited, Settings)
         end
     end
 end

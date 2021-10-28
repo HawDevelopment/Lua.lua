@@ -17,6 +17,10 @@ local SYMBOLS = ToTable("+-*/^#%,(){}[]")
 local OPERATORS = ToTable("+-*/^#%")
 local EQUALITY = ToTable("=><~")
 
+local EQUALITY_OPERATORS = ToTable("== ~=", nil, "[^%s]+")
+local COMPARISON_OPERATORS = ToTable("< > <= >=", nil, "[^%s]+")
+local LOGICAL_OPERATORS = ToTable("and or", nil, "[^%s]+")
+
 local KEYWORDS = ToTable("and break do else elseif end false for function if in local nil not or repeat return then true until while", nil, "[^%s]+")
 local BOOLEAN = ToTable("true false", nil, "[^%s]+")
 
@@ -31,4 +35,8 @@ return {
     NUM = NUM,
     IDEN = IDEN,
     HEX = HEX,
+    
+    EQUALITY_OPERATORS = EQUALITY_OPERATORS,
+    COMPARISON_OPERATORS = COMPARISON_OPERATORS,
+    LOGICAL_OPERATORS = LOGICAL_OPERATORS
 }

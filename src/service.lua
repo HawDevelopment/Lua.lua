@@ -6,8 +6,12 @@
 
 local Lexer = require("src.Generator.Lexer.Lexer")
 local Parser = require("src.Generator.Parser.Parser")
+local Visitor = require("src.Generator.Visitor.Visitor")
+local Compiler = require("src.Generator.Compiler.Compiler")
 
 return {
     Lex = Lexer,
-    Parse = Parser
+    Parse = Parser,
+    Visit = Visitor,
+    Compile = Compiler
 }
