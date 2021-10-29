@@ -46,8 +46,8 @@ do
     end
 
     ToReturn = function(self, indent)
-        return "(" .. self.Name .. ":"
-            .. (type(self.Value) == "table" and TableToString(self.Value or {}, indent) or self.Value)
+        return "(" .. (self.Name or "nil") .. ":"
+            .. (type(self.Value) == "table" and TableToString(self.Value or {}, indent) or (self.Value or "nil"))
             .. ")"
     end
 
