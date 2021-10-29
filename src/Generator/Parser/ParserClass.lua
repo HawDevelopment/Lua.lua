@@ -290,7 +290,7 @@ function ParserClass:ParseLocalStatement(cur)
             end
         end
         
-        return { Name = "LocalStatement", {
+        return { Name = "LocalStatement", Value = {
             idens = vars,
             inits = init
         }, Type = "Statement", Position = cur.Position }

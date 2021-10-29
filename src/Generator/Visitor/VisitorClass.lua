@@ -43,11 +43,15 @@ function VisitorClass:ReturnStatement(cur)
 end
 
 function VisitorClass:FunctionStatement(cur)
-    table.insert(self.Out, cur)
-    for _, value in pairs(cur.body) do
+    table.insert(self.Out, { Name = "FunctionStart", Value = cur.Value.name.Value, Type = "Statement", Position = cur.Position})
+    for _, value in pairs(cur.Value.body) do
         self:Walk(value)
     end
-    table.insert(self.Out, { Name = "FunctionStatementEnd", Value = cur.name, Type = "Statement", Position = cur.Position })
+    table.insert(self.Out, { Name = "FunctionStatementEnd", Value = cur.Value.name.Value, Type = "Statement", Position = cur.Position })
+end
+
+function VisitorClass:CallStatement(cur)
+    table.insert(self.Out, cur)
 end
 
 -- TODO: Add suport for multiple inits
@@ -57,24 +61,34 @@ function VisitorClass:LocalStatement(cur)
     else
         self:Number({ Name = "IntegerLiteral", Value = 0, Type = "Number", Position = cur.Position })
     end
-    table.insert(self.Out, { Name = "LocalStatement", Value = cur.idens[1], Type = "Statement", Position = cur.Position })
+    table.insert(self.Out, { Name = "LocalStatement", Value = cur.Value.idens[1], Type = "Statement", Position = cur.Position })
+end
+
+function VisitorClass:Identifier(cur)
+    return { "GetLocalStatement", cur.Value, Type = "Statement", Position = cur.Position }
 end
 
 local NameToFunction = {
     IntegerLiteral = VisitorClass.Number,
     FloatLiteral = VisitorClass.Number,
+    
     UnaryExpression = VisitorClass.UnaryExpression,
     ReturnStatement = VisitorClass.ReturnStatement,
     BinaryExpression = VisitorClass.BinaryExpression,
     FunctionStatement = VisitorClass.FunctionStatement,
     LocalStatement = VisitorClass.LocalStatement,
+    CallStatement = VisitorClass.CallStatement
+}
+
+local TypeToFunction = {
+    Identifier = VisitorClass.Identifier
 }
 
 function VisitorClass:Walk(node)        
     if node == nil then
         return
     else
-        local tocall = NameToFunction[node.Name]
+        local tocall = NameToFunction[node.Name] or TypeToFunction[node.Type]
         if not tocall then
             return print("No function for " .. node.Name)
         end

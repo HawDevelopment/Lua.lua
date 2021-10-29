@@ -64,14 +64,27 @@ function CompilerClass:CompileUnary(cur)
     end
 end
 
-function CompilerClass:CompileLocal()
-    if not self.Vars then
-        self.Vars = {}
-    end
-    
-    local var = self.Head.Value
+function CompilerClass:CompileLocal(cur)
     -- We assume that eax holds the value of var
-    
+    self.Vars[cur.Value.Value] = self.Pointer
+    self.Pointer = self.Pointer + 4
+    return ("\tmov [ebp - %d], eax\n"):format(self.Pointer - 4)
+end
+
+function CompilerClass:CompileGetLocal(cur)
+    return ("\tmov eax, [ebp - %d]"):format(self.Vars[cur.Value])
+end
+
+function CompilerClass:CompileFunction(cur)
+    self.FunctionName[cur.Value] = self.Head.Pos
+    return ("\tjmp _end%d\n\n%s:\n\tpush ebp\n\tmov ebp, esp\n"):format(self.Head.Pos, cur.Value)
+end
+function CompilerClass:CompileFunctionEnd(cur)
+    return ("\n_end%d:\n"):format(self.FunctionName[cur.Value])
+end
+
+function CompilerClass:CompileCall(cur)
+    return ("\tcall %s\n"):format(cur.Value.Value.base.Value)
 end
 
 -- Binary
@@ -136,7 +149,7 @@ do
 end
 
 function CompilerClass:CompileReturn(_)
-    return "\tpush eax\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret ; Return"
+    return "\tpop ebp\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret ; Return"
 end
 
 local NameToFunction = {
@@ -146,6 +159,11 @@ local NameToFunction = {
     BinaryExpression = CompilerClass.CompileBinary,
     
     LocalStatement = CompilerClass.CompileLocal,
+    GetLocalStatement = CompilerClass.CompileGetLocal,
+    
+    FunctionStart = CompilerClass.CompileFunction,
+    FunctionStatementEnd = CompilerClass.CompileFunctionEnd,
+    CallStatement = CompilerClass.CompileCall
 }
 
 function CompilerClass:Walk(cur)
@@ -163,8 +181,9 @@ function CompilerClass:Walk(cur)
 end
 
 function CompilerClass:Run()
+    self.FunctionName = {}
     self.Vars = {}
-    self.Pointer = 0
+    self.Pointer = 4
     
     while self.Head:GoNext() do
         self.Start = self.Start .. "\n" .. self:Walk(self.Head:Current())
