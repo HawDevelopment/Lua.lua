@@ -16,10 +16,14 @@ CompilerClass.__index = CompilerClass
 function CompilerClass.new(visited, head, version)
     local self = setmetatable({}, CompilerClass)
     
-    self.Nodes = visited
     self.Start = StartAssembly
     self.Function = FunctionsAssembly
     self.End = EndAssembly
+    
+    self.Envoriments = {}
+    self.TopEnvoriment = 0
+    
+    self.Nodes = visited
     self.Head = head or TableHead.new(visited)
     self.Version = version
     
@@ -36,23 +40,39 @@ do
             error("Tried to add nil to index: " .. index)
         end
     end
-    function CompilerClass:AddToStart(...)
+    function CompilerClass:Start(...)
         AddToAny(self, "Start", ...)
     end
-    function CompilerClass:AddToEnd(...)
+    function CompilerClass:End(...)
         AddToAny(self, "End", ...)
     end
-    function CompilerClass:AddToFunction(...)
+    function CompilerClass:Function(...)
         AddToAny(self, "Function", ...)
+    end
+    
+    function CompilerClass:CreateEnv()
+        self.TopEnvoriment = self.TopEnvoriment + 1
+        self.Envoriments[self.TopEnvoriment] = { _ENV = { Pointer = 4 } }
+    end
+    function CompilerClass:RemoveEnv()
+        self.Envoriments[self.TopEnvoriment - 1] = nil
+        self.TopEnvoriment = self.TopEnvoriment - 1
+    end
+    function CompilerClass:GetEnv()
+        return self.Envoriments[self.TopEnvoriment] or error("No env found")
     end
 end
 
-function CompilerClass:CompileInteger(cur)
+function CompilerClass:IntegerLiteral(cur)
     return "\tmov eax, " .. cur.Value .. " ; Integer"
 end
 
--- TODO: AddToStart support for: "a and b or c"
-function CompilerClass:CompileUnary(cur)
+function CompilerClass:ReturnStatement(_)
+    return "\tpop ebp\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret ; Return"
+end
+
+-- TODO: Start support for: "a and b or c"
+function CompilerClass:UnaryExpression(cur)
     -- Evaluate the expression
     local op = cur.Value.op.Value
     if op == "-" then
@@ -64,80 +84,34 @@ function CompilerClass:CompileUnary(cur)
     end
 end
 
-function CompilerClass:CompileLocal(cur)
-    -- We assume that eax holds the value of var
-    self.Vars[cur.Value.Value] = self.Pointer
-    self.Pointer = self.Pointer + 4
-    return ("\tmov [ebp - %d], eax\n"):format(self.Pointer - 4)
-end
-
-function CompilerClass:CompileGetLocal(cur)
-    return ("\tmov eax, [ebp - %d]"):format(self.Vars[cur.Value])
-end
-
-function CompilerClass:CompileFunction(cur)
-    self.FunctionName[cur.Value] = self.Head.Pos
-    return ("\tjmp _end%d\n\n%s:\n\tpush ebp\n\tmov ebp, esp\n"):format(self.Head.Pos, cur.Value)
-end
-function CompilerClass:CompileFunctionEnd(cur)
-    return ("\n_end%d:\n"):format(self.FunctionName[cur.Value])
-end
-
-function CompilerClass:CompileCall(cur)
-    return ("\tcall %s\n"):format(cur.Value.Value.base.Value)
-end
-
 -- Binary
 do
     local OpToString = {
         ["+"] = "\tadd eax, ecx",
         ["*"] = "\timul eax, ecx",
-        ["-"] = [[  sub ecx, eax
-        mov eax, ecx]],
-        ["/"] = [[
-    mov ebx, eax
-    mov eax, ecx
-    mov ecx, ebx
-    cdq
-    idiv ecx]],
-        ["%"] = [[
-    mov ebx, eax
-    mov eax, ecx
-    mov ecx, ebx
-    cdq
-    idiv ecx
-    mov eax, edx]],
-    ["=="] = "cmove", ["~="] = "cmovne",
-    [">"] = "cmovg", [">="] = "cmovge",
-    ["<"] = "cmovl", ["<="] = "cmovle",
-    
-        ["or"] = [[
-    cmp eax, 0
-    je _%d
-    mov eax, 1
-    jmp _end%d]],
-        ["and"] = [[
-    cmp eax, 0
-    jne _%d
-    jmp _end%d]],
+        ["-"] = "\tsub ecx, eax\n\tmov eax, ecx\n",
+        ["/"] = "\tmov ebx, eax\n\tmov eax, ecx\n\tmov ecx, ebx\n\tcdq\n\tidiv ecx\n",
+        ["%"] = "\tmov ebx, eax\n\tmov eax, ecx\n\tmov ecx, ebx\n\tcdq\n\tidiv ecx\n\tmov eax, edx\n",
+        ["=="] = "cmove", ["~="] = "cmovne",
+        [">"] = "cmovg", [">="] = "cmovge",
+        ["<"] = "cmovl", ["<="] = "cmovle",
+        ["or"] = "\tcmp eax, 0\n\tje _%d\n\tmov eax, 1\n\tjmp _end%d\n",
+        ["and"] = "\tcmp eax, 0\n\tjne _%d\n\tjmp _end%d\n"
     }
     local LogicalString = "_%d:\n%s\n\tcmp eax, 0\n\tsetne al\n\tjmp _end%d"
-
     local EqualString = "\tmov ecx, 0\n\tmov edx, 1\n\tcmp ebx, eax\n\t%s ecx, edx\n\tmov eax, ecx"
 
     -- TODO: Add suport for more ops
-    function CompilerClass:CompileBinary(cur)
+    function CompilerClass:BinaryExpression(cur)
         local op, pos = cur.Value.op.Value, self.Head.Pos
         local str = OpToString[op] or error("Not a valid operator! " .. op)
 
         if self.Version.LOGICAL_OPERATORS[op] then
             -- and, or
-            self:AddToFunction(LogicalString:format(pos, self:Walk(self.Head:GoNext()), pos), "")
-            
+            self:Function(LogicalString:format(pos, self:Walk(self.Head:GoNext()), pos), "")
             return str:format(pos, pos) .. "\n_end" .. pos .. ":\n"
-        end
-        
-        if self.Version.EQUALITY_OPERATORS[op] or self.Version.COMPARISON_OPERATORS[op] then
+
+        elseif self.Version.EQUALITY_OPERATORS[op] or self.Version.COMPARISON_OPERATORS[op] then
             -- ==, ~=, >, >=, <, <=
             str = EqualString:format(str, pos, pos)
             return string.format("\tpush eax\n%s\n\tpop ebx\n", self:Walk(self.Head:GoNext())) .. str
@@ -148,23 +122,43 @@ do
     end
 end
 
-function CompilerClass:CompileReturn(_)
-    return "\tpop ebp\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret ; Return"
+function CompilerClass:LocalStatement(cur)
+    -- We assume that eax holds the value of var
+    local env = self:GetEnv()
+    local pointer = env._ENV.Pointer
+    env[cur.Value.Value] = pointer
+    env._ENV.Pointer = pointer + 4
+    return ("\tmov [ebp - %d], eax\n"):format(pointer)
 end
 
-local NameToFunction = {
-    IntegerLiteral = CompilerClass.CompileInteger,
-    ReturnStatement = CompilerClass.CompileReturn,
-    UnaryExpression = CompilerClass.CompileUnary,
-    BinaryExpression = CompilerClass.CompileBinary,
+function CompilerClass:GetLocalStatement(cur)
+    local env = self:GetEnv()
+    if not env[cur.Value] then
+        error("Attemp to acces local '" .. tostring(cur.Value) .. "' (a nil value)")
+    end
+    return ("\tmov eax, [ebp - %d]"):format(self:GetEnv()[cur.Value])
+end
+
+function CompilerClass:FunctionStart(cur)
+    self:CreateEnv()
+    local env = self:GetEnv()
+    env._ENV.EndName = cur.Value
     
-    LocalStatement = CompilerClass.CompileLocal,
-    GetLocalStatement = CompilerClass.CompileGetLocal,
-    
-    FunctionStart = CompilerClass.CompileFunction,
-    FunctionStatementEnd = CompilerClass.CompileFunctionEnd,
-    CallStatement = CompilerClass.CompileCall
-}
+    self.FunctionName[cur.Value] = self.Head.Pos
+    return ("\tjmp _end%d\n\n%s:\n\tpush ebp\n\tmov ebp, esp\n"):format(self.Head.Pos, cur.Value)
+end
+function CompilerClass:FunctionStatementEnd(cur)
+    local env = self:GetEnv()
+    if env._ENV[cur.Value] == nil then
+        error("Expected 'end'")
+    end
+    self:RemoveEnv()
+    return ("\n_end%d:\n"):format(self.FunctionName[cur.Value])
+end
+
+function CompilerClass:CallStatement(cur)
+    return ("\tcall %s\n"):format(cur.Value.Value.base.Value)
+end
 
 function CompilerClass:Walk(cur)
     cur = cur or self.Head:GoNext()
@@ -172,7 +166,7 @@ function CompilerClass:Walk(cur)
     if cur == nil then
         return "nil"
     else
-        local tocall = NameToFunction[cur.Name]
+        local tocall = self[cur.Name]
         if not tocall then
             error("No function for " .. cur.Name)
         end
@@ -181,8 +175,8 @@ function CompilerClass:Walk(cur)
 end
 
 function CompilerClass:Run()
+    self:CreateEnv()
     self.FunctionName = {}
-    self.Vars = {}
     self.Pointer = 4
     
     while self.Head:GoNext() do
