@@ -65,7 +65,7 @@ function VisitorClass:LocalStatement(cur)
 end
 
 function VisitorClass:Identifier(cur)
-    return { "GetLocalStatement", cur.Value, Type = "Statement", Position = cur.Position }
+    table.insert(self.Out, { Name = "GetLocalStatement", Value = cur.Value, Type = "Statement", Position = cur.Position })
 end
 
 local NameToFunction = {
