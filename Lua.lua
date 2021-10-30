@@ -62,6 +62,20 @@ do
     end
 end
 
+-- For RunSource
+local Copy
+Copy = function(tab)
+    local new = {}
+    for key, value in pairs(tab) do
+        if type(value) == "table" then
+            new[key] = Copy(value)
+        else
+            new[key] = value
+        end
+    end
+    return new
+end
+
 local function ValueInTable(tab, value)
     for i, val in pairs(tab) do
         if val == value then
@@ -105,7 +119,7 @@ function RunSource(source, settings)
     else
         tokens = Lua.Lex(source)
         ast = Lua.Parse(tokens)
-        visited = Lua.Visit(ast)
+        visited = Lua.Visit(Copy(ast))
     end
     
     return tokens, ast, visited
@@ -127,7 +141,7 @@ local function Run(lexed, parsed, visited, settings)
         PrintTokens(visited)
     end
     if settings.Compile then
-        local out = Lua.Compile(visited)
+        local out = Lua.Compile(Copy(visited))
         if settings.Output then
             local file = io.open(settings.Output .. ".asm", "w")
             file:write(out)
