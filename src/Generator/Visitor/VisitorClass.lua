@@ -30,8 +30,9 @@ end
 
 function VisitorClass:BinaryExpression(cur)
     self:Walk(cur.Value.left)
-    table.insert(self.Out, cur)
+    table.insert(self.Out, { Name = "PushIntruction", Type = "Instruction", Position = cur.Position })
     self:Walk(cur.Value.right)
+    table.insert(self.Out, cur)
 end
 
 function VisitorClass:ReturnStatement(cur)
@@ -43,15 +44,29 @@ function VisitorClass:ReturnStatement(cur)
 end
 
 function VisitorClass:FunctionStatement(cur)
-    table.insert(self.Out, { Name = "FunctionStart", Value = cur.Value.name.Value, Type = "Statement", Position = cur.Position})
+    
+    local oldout = self.Out
+    self.Out = {}
     for _, value in pairs(cur.Value.body) do
         self:Walk(value)
     end
-    table.insert(self.Out, { Name = "FunctionStatementEnd", Value = cur.Value.name.Value, Type = "Statement", Position = cur.Position })
+    cur.Value.body = self.Out
+    self.Out = oldout
+    
+    table.insert(self.Out, { Name = "FunctionStatement", Value = {
+        name = cur.Value.name.Value,
+        body = cur.Value.body,
+        params = cur.Value.params,
+    }, Type = "Statement", Position = cur.Position})
 end
 
 function VisitorClass:CallStatement(cur)
-    table.insert(self.Out, cur)
+    for _, value in pairs(cur.Value.Value.args) do
+        self:Walk(value)
+        table.insert(self.Out, { Name = "PushIntruction", Type = "Instruction", Position = value.Position })
+    end
+    
+    table.insert(self.Out, { Name = "CallStatement", Value = { name = cur.Value.Value.base.Value, args = cur.Value.Value.args }, Type = "Statement", Position = cur.Position })
 end
 
 -- TODO: Add suport for multiple inits
