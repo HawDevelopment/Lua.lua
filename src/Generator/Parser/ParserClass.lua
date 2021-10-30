@@ -142,7 +142,7 @@ function ParserClass:ParseReturnStatement(cur)
     cur = cur or self.Head:Current()
     
     local expressions = {}
-    if self.Head:Next().Name ~= "end" then
+    if self.Head:Next() and self.Head:Next().Name ~= "end" then
         self.Head:GoNext()
         while true do
             local expression = self:GetExpectedExpression()
@@ -155,6 +155,8 @@ function ParserClass:ParseReturnStatement(cur)
                 break
             end
         end
+    else
+        self.Head:GoNext()
     end
     
     return { Name = "ReturnStatement", Value = expressions, Type = "Statement", Position = cur.Position }
