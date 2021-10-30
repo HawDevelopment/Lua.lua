@@ -76,10 +76,6 @@ do
     end
 end
 
-function CompilerClass:IntegerLiteral(cur)
-    return self.Util:Mov("eax", cur.Value)
-end
-
 function CompilerClass:ReturnStatement(_)
     return self.Util:Pop("ebp") .. "\tret"
 end
@@ -206,6 +202,21 @@ function CompilerClass:CallStatement(cur)
         body = body .. "\tpop eax\n\tmov " .. ArgumentLookUp[i] .. ", eax\n"
     end
     return ("%s\tcall %s\n"):format(body, cur.Value.name)
+end
+
+-- If statement
+do
+    local CompareString = "\tcmp eax, 1\n\tjne %s\n"
+    
+    function CompilerClass:IfStatement(cur)
+        local pos = self.Head.Pos
+        local str = CompareString:format("_end" .. pos)
+        for key, value in pairs(cur.Value[1].body) do
+            str = str .. self:Walk(value)
+        end
+        str = str .. self.Util:Label("_end" .. pos)
+        return str
+    end
 end
 
 function CompilerClass:Walk(cur)

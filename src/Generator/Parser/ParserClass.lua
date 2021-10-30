@@ -197,12 +197,10 @@ function ParserClass:ParseIfStatement(cur)
     local token = self.Head:Current()
     if token.Name == "else" then
         
-        condition = self:GetExpectedExpression()
-        self.Head:Expect("then", "Expected then after elseif condition!")
+        self.Head:GoNext()
         body = self:ParseBody()
         
         table.insert(statements, #statements + 1, { Name = "ElseStatement", Value = {
-            condition = condition,
             body = body
         }, Type = "Statement", Position = token.Position })
     end
