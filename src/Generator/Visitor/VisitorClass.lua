@@ -19,54 +19,60 @@ function VisitorClass.new(ast, head)
     return self
 end
 
+function VisitorClass:_instruction(name, ...)
+    local value = self.Ast.Value
+    if ... then
+        value = { ... }
+    end
+    table.insert(self.Out, { Name = name, Value = value , Type = "Instruction" })
+end
+
 function VisitorClass:Number(cur)
-    table.insert(self.Out, cur)
+    self:_instruction("Mov", "eax", cur.Value)
 end
 
 function VisitorClass:UnaryExpression(cur)
     self:Walk(cur.Value.expr)
-    table.insert(self.Out, cur)
+    return cur
 end
 
 function VisitorClass:BinaryExpression(cur)
     self:Walk(cur.Value.left)
-    table.insert(self.Out, { Name = "PushIntruction", Type = "Instruction", Position = cur.Position })
+    self:_instruction("Push", "eax")
     self:Walk(cur.Value.right)
-    table.insert(self.Out, cur)
+    
+    cur.Value = cur.Value.op.Value -- Get the string of the operator
+    return cur
 end
 
 function VisitorClass:ReturnStatement(cur)
     
     for _, value in pairs(cur.Value) do
-        self:Walk(value)
+        table.insert(self.Out, self:Walk(value))
     end
-    table.insert(self.Out, cur)
+    return cur
 end
 
 function VisitorClass:FunctionStatement(cur)
     
-    local oldout = self.Out
-    self.Out = {}
+    local body = {}
     for _, value in pairs(cur.Value.body) do
-        self:Walk(value)
+        table.insert(body, self:Walk(value))
     end
-    cur.Value.body = self.Out
-    self.Out = oldout
+    cur.Value.body = body
     
-    table.insert(self.Out, { Name = "FunctionStatement", Value = {
-        name = cur.Value.name.Value,
-        body = cur.Value.body,
-        params = cur.Value.params,
-    }, Type = "Statement", Position = cur.Position})
+    cur.Value.name = cur.Value.name.Value    
+    return cur
 end
 
 function VisitorClass:CallStatement(cur)
     for _, value in pairs(cur.Value.Value.args) do
-        self:Walk(value)
-        table.insert(self.Out, { Name = "PushIntruction", Type = "Instruction", Position = value.Position })
+        table.insert(self.Out, self:Walk(value))
+        self:_instruction("Push", "eax")
     end
     
-    table.insert(self.Out, { Name = "CallStatement", Value = { name = cur.Value.Value.base.Value, args = cur.Value.Value.args }, Type = "Statement", Position = cur.Position })
+    cur.Value = { name = cur.Value.Value.base.Value, args = cur.Value.Value.args }
+    return cur
 end
 
 -- TODO: Add suport for multiple inits
@@ -74,13 +80,15 @@ function VisitorClass:LocalStatement(cur)
     if #cur.Value.inits > 0 then
         self:Walk(cur.Value.inits[1])
     else
-        self:Number({ Name = "IntegerLiteral", Value = 0, Type = "Number", Position = cur.Position })
+        self:_instruction("Mov", "eax", 0) -- If there is no init, set it to 0
     end
-    table.insert(self.Out, { Name = "LocalStatement", Value = cur.Value.idens[1], Type = "Statement", Position = cur.Position })
+    cur.Value = cur.Value.idens[1] -- Get the name of the variable
+    return cur
 end
 
 function VisitorClass:Identifier(cur)
-    table.insert(self.Out, { Name = "GetLocalStatement", Value = cur.Value, Type = "Statement", Position = cur.Position })
+    cur.Value = cur.Value.Value -- Get the string of the identifier
+    return cur
 end
 
 local NameToFunction = {
@@ -107,13 +115,16 @@ function VisitorClass:Walk(node)
         if not tocall then
             return print("No function for " .. node.Name)
         end
-        tocall(self, node)
+        return tocall(self, node)
     end
 end
 
 function VisitorClass:Run()
     while self.Head:GoNext() do
-        self:Walk(self.Head:Current())
+        local ret = self:Walk(self.Head:Current())
+        if ret then
+            table.insert(self.Out, ret)
+        end
     end
     return self.Out
 end

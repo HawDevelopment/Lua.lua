@@ -7,6 +7,7 @@
 local LOG = false
 
 local TableHead = require("src.Generator.Util.TableHead")
+local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
 
 local StartAssembly = "section .text\nglobal _main\nextern _printf\nprint:\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret\n\n_main:"
 local FunctionsAssembly = ""
@@ -23,6 +24,8 @@ function CompilerClass.new(visited, head, version)
         Function = FunctionsAssembly,
         End = EndAssembly
     }
+    
+    self.Util = CompilerUtil.new(self)
     
     self.GlobalEnv = { ["print"] = true }
     self.Envoriments = {}
@@ -73,19 +76,12 @@ do
     end
 end
 
--- Intructions
-do
-    function CompilerClass:PushIntruction(_)
-        return "\tpush eax\n"
-    end
-end
-
 function CompilerClass:IntegerLiteral(cur)
-    return "\tmov eax, " .. cur.Value .. " ; Integer\n"
+    return self.Util:Mov("eax", cur.Value)
 end
 
 function CompilerClass:ReturnStatement(_)
-    return "\n\tpop ebp\n\tret ; Return"
+    return self.Util:Pop("ebp") .. "\tret"
 end
 
 -- TODO: Start support for: "a and b or c"
@@ -120,8 +116,8 @@ do
 
     -- TODO: Add suport for more ops
     function CompilerClass:BinaryExpression(cur)
-        local op, pos = cur.Value.op.Value, self.Head.Pos
-        local str = OpToString[op] or error("Not a valid operator! " .. op)
+        local op, pos = cur.Value, self.Head.Pos
+        local str = assert(OpToString[op], "The operator: " .. op .. " is not a valid operator!")
 
         if self.Version.LOGICAL_OPERATORS[op] then
             -- and, or
@@ -218,6 +214,11 @@ function CompilerClass:Walk(cur)
     if cur == nil then
         return "nil"
     else
+        if cur.Type == "Instruction" then
+            local tocall = assert(self.Util[cur.Name], "Could not find intruction with name: " .. tostring(cur.Name))
+            if cur.Value then return tocall(self.Util, unpack(cur.Value)) end
+            return tocall(self.Util)
+        end
         local tocall = self[cur.Name]
         if not tocall then
             error("No function for " .. cur.Name)
