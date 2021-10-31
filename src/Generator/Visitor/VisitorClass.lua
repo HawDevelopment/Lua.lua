@@ -90,6 +90,13 @@ function VisitorClass:LocalStatement(cur, toadd)
     table.insert(toadd, cur)
 end
 
+-- TODO: Add suport for multiple values
+function VisitorClass:AssignmentStatement(cur, toadd)
+    self:Walk(cur.Value.values[1], toadd)
+    cur.Value = cur.Value.idens[1] -- Get the name of the variable
+    table.insert(toadd, cur)
+end
+
 function VisitorClass:Identifier(cur, toadd)
     table.insert(toadd, { Name = "GetLocalExpression", Value = cur.Value, Type = "Expression" })
 end
@@ -121,6 +128,8 @@ local NameToFunction = {
     ReturnStatement = VisitorClass.ReturnStatement,
     BinaryExpression = VisitorClass.BinaryExpression,
     FunctionStatement = VisitorClass.FunctionStatement,
+    
+    AssignmentStatement = VisitorClass.AssignmentStatement,
     LocalStatement = VisitorClass.LocalStatement,
     CallStatement = VisitorClass.CallStatement,
     

@@ -152,6 +152,15 @@ function CompilerClass:GetLocalExpression(cur)
     return ("\tmov eax, [ebp - %d]\n"):format(self:GetEnv()[cur.Value])
 end
 
+function CompilerClass:AssignmentStatement(cur)
+    -- We expect that eax holds the value
+    local env = self:GetEnv()
+    if not env[cur.Value.Value] then
+        error("Attemp to assign to local '" .. tostring(cur.Value.Value) .. "' (a nil value)")
+    end
+    return ("\tmov [ebp - %d], eax\n"):format(env[cur.Value.Value])
+end
+
 local ArgumentLookUp = { "edi", "esi", "edx", "ecx" }
 
 function CompilerClass:FunctionStatement(cur)
