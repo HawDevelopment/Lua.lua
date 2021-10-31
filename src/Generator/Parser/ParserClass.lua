@@ -383,7 +383,7 @@ function ParserClass:ParseAssignmentOrCallStatement(start)
         end
     end
     
-    return { "AssignmentStatement", Value = {
+    return { Name = "AssignmentStatement", Value = {
         idens = names,
         values = expressions
     }, Type = "Statement", Position = start.Position }
