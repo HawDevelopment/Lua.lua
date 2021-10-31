@@ -36,7 +36,7 @@ function VisitorClass:Boolean(cur, toadd)
 end
 
 function VisitorClass:UnaryExpression(cur, toadd)
-    table.insert(toadd, self:Walk(cur.Value.expr))
+    self:Walk(cur.Value.expr, toadd)
     table.insert(toadd, cur)
 end
 
