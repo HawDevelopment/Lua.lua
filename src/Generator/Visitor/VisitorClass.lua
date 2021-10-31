@@ -119,6 +119,22 @@ function VisitorClass:IfStatement(cur, toadd)
     table.insert(toadd, cur)
 end
 
+function VisitorClass:WhileStatement(cur, toadd)
+    local con = {}
+    self:Walk(cur.Value.con, con)
+    
+    local body = {}
+    for _, towalk in pairs(cur.Value.body) do
+        self:Walk(towalk, body)
+    end
+    cur.Value = { condition = con, body = body }
+    table.insert(toadd, cur)
+end
+
+function VisitorClass:BreakStatement(cur, toadd)
+    table.insert(toadd, cur)
+end
+
 local NameToFunction = {
     IntegerLiteral = VisitorClass.Number,
     FloatLiteral = VisitorClass.Number,
@@ -133,7 +149,9 @@ local NameToFunction = {
     LocalStatement = VisitorClass.LocalStatement,
     CallStatement = VisitorClass.CallStatement,
     
-    IfStatement = VisitorClass.IfStatement
+    IfStatement = VisitorClass.IfStatement,
+    WhileStatement = VisitorClass.WhileStatement,
+    BreakStatement = VisitorClass.BreakStatement,
 }
 
 local TypeToFunction = {

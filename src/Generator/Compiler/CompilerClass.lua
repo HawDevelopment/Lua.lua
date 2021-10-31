@@ -217,7 +217,7 @@ function CompilerClass:CallStatement(cur)
     for i, _ in pairs(cur.Value.args) do
         body = body .. self.Util:Pop("eax") .. self.Util:Mov(ArgumentLookUp[i], "eax")
     end
-    return ("%s\tcall %s ; -- Call function %s \n"):format(body, self.GlobalEnv[cur.Value.name], cur.Value.name)
+    return ("\tpush eax\n%s\tcall %s ; -- Call function %s \n\tpop eax\n"):format(body, self.GlobalEnv[cur.Value.name], cur.Value.name)
 end
 
 -- If statement
@@ -265,6 +265,32 @@ do
             str = self:_genifstatement(cur.Value[1], "_end" .. name)
         end
         str = str .. self.Util:Label("_end" .. name)
+        return str
+    end
+end
+
+-- While statement
+do
+    local CompareString = "\tcmp eax, 1\n\tjne %s\n"
+    function CompilerClass:WhileStatement(cur)
+        local str = ""
+        local name = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
+        local endpos = "_end" .. name
+        
+        str = str .. self.Util:Label(name)
+        for _, value in pairs(cur.Value.condition) do
+            str = str .. self:Walk(value)
+        end
+        str = str .. CompareString:format(endpos)
+        for _, value in pairs(cur.Value.body) do
+            if value.Name == "BreakStatement" then
+                str = str .. self.Util:Jmp(endpos)
+            else
+                str = str .. self:Walk(value)
+            end
+        end
+        str = str .. self.Util:Jmp(name)
+        str = str .. self.Util:Label(endpos)
         return str
     end
 end
