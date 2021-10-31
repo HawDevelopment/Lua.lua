@@ -91,8 +91,7 @@ function VisitorClass:LocalStatement(cur, toadd)
 end
 
 function VisitorClass:Identifier(cur, toadd)
-    cur.Value = cur.Value.Value -- Get the string of the identifier
-    table.insert(toadd, cur)
+    table.insert(toadd, { Name = "GetLocalExpression", Value = cur.Value, Type = "Expression" })
 end
 
 function VisitorClass:IfStatement(cur, toadd)
@@ -100,13 +99,14 @@ function VisitorClass:IfStatement(cur, toadd)
     local statements = cur.Value.statements
     local clauses = {}
     for _, value in pairs(statements) do
-        self:Walk(value.Value.condition, toadd)
+        local con = {}
+        self:Walk(value.Value.condition, con)
         
         local body = {}
         for _, towalk in pairs(value.Value.body) do
             self:Walk(towalk, body)
         end
-        table.insert(clauses, { body = body })
+        table.insert(clauses, { body = body, condition = con })
     end
     cur.Value = clauses
     table.insert(toadd, cur)
