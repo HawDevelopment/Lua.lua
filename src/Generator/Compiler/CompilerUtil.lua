@@ -39,7 +39,7 @@ end
 
 function CompilerUtil:Label(str)
     assert(type(str) == "string", "Expected string, got " .. type(str))
-    return ("\t" .. str .. ":\n")
+    return (str .. ":\n")
 end
 
 function CompilerUtil:AdvLabel(str)
