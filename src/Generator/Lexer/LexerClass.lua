@@ -49,7 +49,7 @@ do
     
     function LexerClass:GetToLineEnd()
         -- We add an extra line so it neven fails
-        return string.match(self.Source .. "\n", "[.%s%p%a]-\n", self.Head.Pos)
+        return string.match(self.Source .. "\n", "[.%.%d%p%a%s]-\n", self.Head.Pos)
     end
 end
 
