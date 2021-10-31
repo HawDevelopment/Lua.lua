@@ -70,10 +70,15 @@ function VisitorClass:FunctionStatement(cur, toadd)
 end
 
 function VisitorClass:CallStatement(cur, toadd)
-    for _, value in pairs(cur.Value.Value.args) do
-        self:Walk(value, toadd)
-        self:_instruction(toadd, "Push", "eax")
+    if #cur.Value.Value.args > 1 then
+        for _, value in pairs(cur.Value.Value.args) do
+            self:Walk(value, toadd)
+            self:_instruction(toadd, "Push", "eax")
+        end
+    elseif #cur.Value.Value.args == 1 then
+        self:Walk(cur.Value.Value.args[1], toadd)
     end
+    
     
     cur.Value = { name = cur.Value.Value.base.Value, args = cur.Value.Value.args }
     table.insert(toadd, cur)

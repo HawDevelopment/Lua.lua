@@ -214,10 +214,17 @@ function CompilerClass:CallStatement(cur)
     end
     
     local body = ""
-    for i, _ in pairs(cur.Value.args) do
-        body = body .. self.Util:Pop("eax") .. self.Util:Mov(ArgumentLookUp[i], "eax")
+    if #cur.Value.args > 1 then
+        for i, _ in pairs(cur.Value.args) do
+            body = body .. self.Util:Pop("eax") .. self.Util:Mov(ArgumentLookUp[i], "eax")
+        end
+    else
+        local arg = cur.Value.args[1]
+        if arg then
+            body = body .. self.Util:Mov(ArgumentLookUp[1], "eax")
+        end
     end
-    return ("\tpush eax\n%s\tcall %s ; -- Call function %s \n\tpop eax\n"):format(body, self.GlobalEnv[cur.Value.name], cur.Value.name)
+    return ("%s\tsub esp, 4 ; Remove and it will break print!!!\n\tcall %s ; -- Call function %s\n"):format(body, self.GlobalEnv[cur.Value.name], cur.Value.name)
 end
 
 -- If statement
