@@ -9,7 +9,7 @@ local LOG = false
 local TableHead = require("src.Generator.Util.TableHead")
 local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
 
-local StartAssembly = "section .text\nglobal _main\nextern _printf\nprint:\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret\n\n_main:"
+local StartAssembly = "section .text\nglobal _main\nextern _printf\nprint:\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret\n\n_main:\n"
 local FunctionsAssembly = ""
 local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0 ; Used for print"
 
@@ -27,7 +27,7 @@ function CompilerClass.new(visited, head, version)
     
     self.Util = CompilerUtil.new(self)
     
-    self.GlobalEnv = { ["print"] = true }
+    self.GlobalEnv = { ["print"] = "print" }
     self.Envoriments = {}
     self.TopEnvoriment = 0
     
@@ -42,6 +42,10 @@ local function Log(...)
     if LOG then
         print(...)
     end
+end
+
+local function GetHash(cur)
+    return tostring(cur):sub(8, -1)
 end
 
 -- Util
@@ -68,7 +72,7 @@ do
         self.Envoriments[self.TopEnvoriment] = { _ENV = { Pointer = 4 } }
     end
     function CompilerClass:RemoveEnv()
-        self.Envoriments[self.TopEnvoriment - 1] = nil
+        self.Envoriments[self.TopEnvoriment] = nil
         self.TopEnvoriment = self.TopEnvoriment - 1
     end
     function CompilerClass:GetEnv()
@@ -108,7 +112,7 @@ do
         ["and"] = "\tpop ecx\n\tpush eax\nmov eax, ecx\n\tcmp eax, 0\n\tjne _%d\n\tjmp _end%d\n"
     }
     local LogicalString = "_%d:\npop eax\n\tcmp eax, 0\n\tsetne al\n\tjmp _end%d"
-    local EqualString = "\tmov ecx, 0\n\tmov edx, 1\n\tcmp ebx, eax\n\t%s ecx, edx\n\tmov eax, ecx"
+    local EqualString = "\tmov ebx, 0\n\tmov edx, 1\n\tcmp ecx, eax\n\t%s ebx, edx\n\tmov eax, ebx"
 
     -- TODO: Add suport for more ops
     function CompilerClass:BinaryExpression(cur)
@@ -140,7 +144,7 @@ function CompilerClass:LocalStatement(cur)
     return ("\tmov [ebp - %d], eax\n"):format(pointer)
 end
 
-function CompilerClass:GetLocalStatement(cur)
+function CompilerClass:GetLocalExpression(cur)
     local env = self:GetEnv()
     if not env[cur.Value] then
         error("Attemp to acces local '" .. tostring(cur.Value) .. "' (a nil value)")
@@ -152,9 +156,10 @@ local ArgumentLookUp = { "edi", "esi", "edx", "ecx" }
 
 function CompilerClass:FunctionStatement(cur)
     Log("Creating function: " .. cur.Value.name)
+    local hash = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
     self:CreateEnv()
     local env = self:GetEnv()
-    env._ENV.EndName = cur.Value.name
+    env._ENV.EndName = hash
     
     local body = ""
     
@@ -175,46 +180,82 @@ function CompilerClass:FunctionStatement(cur)
     for _, value in pairs(cur.Value.body) do
         body = body .. self:Walk(value)
     end
+    if cur.Value.body[#cur.Value.body].Name ~= "return" then
+        body = body .. "\tret\n"
+    end
     
     env = self:GetEnv()
-    if env._ENV.EndName ~= cur.Value.name then
+    if env._ENV.EndName ~= hash then
         error("Expected 'end'")
     end
     
-    
     Log("Added function: " .. cur.Value.name)
     self:RemoveEnv()
-    self.GlobalEnv[cur.Value.name] = true
-    self:Function(("%s:\n\tpush ebp\n\tmov ebp, esp\n%s"):format(cur.Value.name, body))
+    self.GlobalEnv[cur.Value.name] = hash
+    self:Function(("%s:\n\tpush ebp\n\tmov ebp, esp\n%s"):format(hash, body))
     return "\t; Create " .. cur.Value.name .. " function\n"
 end
 
 function CompilerClass:CallStatement(cur)
+    -- !THE VISITOR CREATES INSTRUCTIONS TO PUSH THE PARAMETERS!
+    
     Log("Calling function: " .. cur.Value.name)
     if not self.GlobalEnv[cur.Value.name] then
-        for key, value in pairs(self.GlobalEnv) do
-            print(key, value)
-        end
         error("Attemp to call function '" .. tostring(cur.Value.name) .. "' (a nil value)")
     end
+    
     local body = ""
     for i, _ in pairs(cur.Value.args) do
-        body = body .. "\tpop eax\n\tmov " .. ArgumentLookUp[i] .. ", eax\n"
+        body = body .. self.Util:Pop("eax") .. self.Util:Mov(ArgumentLookUp[i], "eax")
     end
-    return ("%s\tcall %s\n"):format(body, cur.Value.name)
+    return ("%s\tcall %s ; -- Call function %s \n"):format(body, self.GlobalEnv[cur.Value.name], cur.Value.name)
 end
 
 -- If statement
 do
     local CompareString = "\tcmp eax, 1\n\tjne %s\n"
     
-    function CompilerClass:IfStatement(cur)
-        local pos = self.Head.Pos
-        local str = CompareString:format("_end" .. pos)
-        for key, value in pairs(cur.Value[1].body) do
+    function CompilerClass:_genifstatement(tab, endpos)
+        local str = ""
+        for _, value in pairs(tab.condition) do
             str = str .. self:Walk(value)
         end
-        str = str .. self.Util:Label("_end" .. pos)
+        
+        str = str .. CompareString:format(endpos)
+        
+        for key, value in pairs(tab.body) do
+            str = str .. self:Walk(value)
+        end
+        return str
+    end
+    
+    function CompilerClass:IfStatement(cur)
+        local name = GetHash(cur)
+        local str = ""
+        if #cur.Value > 1 then
+            -- theres also some elseif or else statements
+            for key, value in pairs(cur.Value) do
+                if #value.condition > 0 then
+                    -- If or elseif
+                    local endpos = cur.Value[key + 1] and ("_else" .. name .. "_" .. key + 1) or ("_end" .. name)
+                    str = str .. self:_genifstatement(value, endpos)
+                    str = str .. self.Util:Jmp("_end" .. name)
+                    
+                    if cur.Value[key + 1] then
+                        -- Add label for the next statement
+                        str = str .. self.Util:Label(endpos)
+                    end
+                else
+                    for _, value in pairs(value.body) do
+                        str = str .. self:Walk(value)
+                    end
+                    str = str .. self.Util:Jmp("_end" .. name)
+                end
+            end
+        else
+            str = self:_genifstatement(cur.Value[1], "_end" .. name)
+        end
+        str = str .. self.Util:Label("_end" .. name)
         return str
     end
 end
@@ -243,7 +284,7 @@ function CompilerClass:Run()
     self.Pointer = 4
     
     while self.Head:GoNext() do
-        self.File.Start = self.File.Start .. "\n" .. self:Walk(self.Head:Current())
+        self.File.Start = self.File.Start .. self:Walk(self.Head:Current())
     end
     
     return (self.File.Start .. "\n" .. self.File.Function .. "\n" .. self.File.End):gsub("\t", "   ")
