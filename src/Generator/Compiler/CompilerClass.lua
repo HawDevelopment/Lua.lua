@@ -9,7 +9,7 @@ local LOG = false
 local TableHead = require("src.Generator.Util.TableHead")
 local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
 
-local StartAssembly = "section .text\nglobal _main\nextern _printf\nprint:\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret\n\n_main:\n"
+local StartAssembly = "section .text\nglobal _main\nextern _printf\nprint:\n\tpush edi\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret\n\n_main:\n\tpush ebp\n\tmov ebp, esp\n"
 local FunctionsAssembly = ""
 local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0 ; Used for print"
 
@@ -89,9 +89,9 @@ function CompilerClass:UnaryExpression(cur)
     -- Evaluate the expression
     local op = cur.Value.op.Value
     if op == "-" then
-        return "\tneg eax ; Unary"
+        return "\tneg eax ; Unary\n"
     elseif op == "not" then
-        return "\tcmp eax, 0\n\tmov eax, 0\n\tsete al"
+        return "\tcmp eax, 0\n\tmov eax, 0\n\tsete al\n"
     else
         print("Unary with name: " .. tostring(op) .. " not found!")
     end
@@ -180,8 +180,8 @@ function CompilerClass:FunctionStatement(cur)
     for _, value in pairs(cur.Value.body) do
         body = body .. self:Walk(value)
     end
-    if cur.Value.body[#cur.Value.body].Name ~= "return" then
-        body = body .. "\tret\n"
+    if cur.Value.body[#cur.Value.body].Name ~= "ReturnStatement" then
+        error("Function " .. cur.Value.name .. " does not return have a return statement!")
     end
     
     env = self:GetEnv()
