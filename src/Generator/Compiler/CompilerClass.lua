@@ -9,7 +9,8 @@ local LOG = false
 local TableHead = require("src.Generator.Util.TableHead")
 local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
 
-local StartAssembly = "section .text\nglobal _main\nextern _printf\nprint:\n\tpush edi\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tret\n\n_main:\n\tpush ebp\n\tmov ebp, esp\n"
+local PrintAssembly = "print:\n\tpush ebp\n\tmov ebp, esp\n\tpush edi\n\tpush print_number\n\tcall _printf\n\tmov eax, 0\n\tmov ecx, 0\n\tpop ebx\n\tpop ebx\n\tpop ebp\n\tret\n"
+local StartAssembly = "section .text\nglobal _main\nextern _printf\n" .. PrintAssembly .. "\n_main:\n"
 local FunctionsAssembly = ""
 local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0 ; Used for print"
 
