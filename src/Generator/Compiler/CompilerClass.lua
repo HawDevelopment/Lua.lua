@@ -319,7 +319,7 @@ do
         local stopassembly = "[ebp - " .. env["__iter"] .. "]"
         str = str .. self.Util:Mov("eax", varassembly)
         str = str .. self.Util:Mov("ebx", stopassembly)
-        str = str .. ForCompareString:format("eax", "ebx", endpos)
+        str = str .. ForCompareString:format("ebx", "eax", endpos)
         for _, value in pairs(cur.Value.body) do
             if value.Name == "BreakStatement" then
                 str = str .. self.Util:Jmp(endpos)
