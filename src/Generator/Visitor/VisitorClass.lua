@@ -135,6 +135,20 @@ function VisitorClass:WhileStatement(cur, toadd)
     cur.Value = { condition = con, body = body }
     table.insert(toadd, cur)
 end
+function VisitorClass:NumericForStatement(cur, toadd)
+    local body = {}
+    for _, value in pairs(cur.Value.body) do
+        self:Walk(value, body)
+    end
+    local start = {}
+    self:Walk(cur.Value.start, start)
+    local stop = {}
+    self:Walk(cur.Value.stop, stop)
+    local iter = {}
+    self:Walk(cur.Value.iter, iter)
+    cur.Value = { var = cur.Value.var, start = start, stop = stop, iter = iter, body = body }
+    table.insert(toadd, cur)
+end
 
 function VisitorClass:BreakStatement(cur, toadd)
     table.insert(toadd, cur)
@@ -156,6 +170,7 @@ local NameToFunction = {
     
     IfStatement = VisitorClass.IfStatement,
     WhileStatement = VisitorClass.WhileStatement,
+    NumericForStatement = VisitorClass.NumericForStatement,
     BreakStatement = VisitorClass.BreakStatement,
 }
 

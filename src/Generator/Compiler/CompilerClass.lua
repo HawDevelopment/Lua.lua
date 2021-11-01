@@ -137,11 +137,7 @@ end
 
 function CompilerClass:LocalStatement(cur)
     -- We assume that eax holds the value of var
-    local env = self:GetEnv()
-    local pointer = env._ENV.Pointer
-    env[cur.Value.Value] = pointer
-    env._ENV.Pointer = pointer + 4
-    return ("\tmov [ebp - %d], eax\n"):format(pointer)
+    return self.Util:LocalVariable(cur.Value.Value)
 end
 
 function CompilerClass:GetLocalExpression(cur)
@@ -276,9 +272,9 @@ do
     end
 end
 
--- While statement
+-- Loop statement
 do
-    local CompareString = "\tcmp eax, 1\n\tjne %s\n"
+    local WhileCompareString = "\tcmp eax, 1\n\tjne %s\n"
     function CompilerClass:WhileStatement(cur)
         local str = ""
         local name = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
@@ -288,7 +284,7 @@ do
         for _, value in pairs(cur.Value.condition) do
             str = str .. self:Walk(value)
         end
-        str = str .. CompareString:format(endpos)
+        str = str .. WhileCompareString:format(endpos)
         for _, value in pairs(cur.Value.body) do
             if value.Name == "BreakStatement" then
                 str = str .. self.Util:Jmp(endpos)
@@ -300,7 +296,49 @@ do
         str = str .. self.Util:Label(endpos)
         return str
     end
+    
+    local ForCompareString = "\tcmp %s, %s\n\tjl %s\n"
+    function CompilerClass:NumericForStatement(cur)
+        local name = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
+        local endpos = "_end" .. name
+        local env = self:GetEnv()
+        
+        local str = ""
+        for _, value in pairs(cur.Value.start) do
+            str = str .. self:Walk(value)
+        end
+        str = str .. self.Util:LocalVariable(cur.Value.var.Value)
+        for _, value in pairs(cur.Value.stop) do
+            str = str .. self:Walk(value)
+        end
+        str = str .. self.Util:LocalVariable("__iter")
+        
+        str = str .. self.Util:Label(name)
+        
+        local varassembly = "[ebp - " .. env[cur.Value.var.Value] .. "]"
+        local stopassembly = "[ebp - " .. env["__iter"] .. "]"
+        str = str .. self.Util:Mov("eax", varassembly)
+        str = str .. self.Util:Mov("ebx", stopassembly)
+        str = str .. ForCompareString:format("eax", "ebx", endpos)
+        for _, value in pairs(cur.Value.body) do
+            if value.Name == "BreakStatement" then
+                str = str .. self.Util:Jmp(endpos)
+            else
+                str = str .. self:Walk(value)
+            end
+        end
+        
+        
+        str = str .. self.Util:Add(varassembly, "1")
+        str = str .. self.Util:Mov(varassembly, "eax")
+        
+        str = str .. self.Util:Jmp(name)
+        str = str .. self.Util:Label(endpos)
+        return str
+    end
 end
+
+
 
 function CompilerClass:Walk(cur)
     cur = cur or self.Head:GoNext()

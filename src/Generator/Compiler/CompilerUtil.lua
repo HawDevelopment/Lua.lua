@@ -46,5 +46,18 @@ function CompilerUtil:AdvLabel(str)
     return self:Label(str) .. "\tpush ebp\n\tmov ebp, esp\n"
 end
 
+function CompilerUtil:Add(str, str2)
+    return ("\tmov eax, %s\n\tmov ecx, %s\n\tadd eax, ecx\n"):format(str, str2)
+end
+
+function CompilerUtil:LocalVariable(str)
+    assert(type(str) == "string", "Expected string, got " .. type(str))
+    local env = self.Class:GetEnv()
+    local pointer = env._ENV.Pointer
+    env[str] = pointer
+    env._ENV.Pointer = pointer + 4
+    return ("\tmov [ebp - %d], eax\n"):format(pointer)
+end
+
 
 return CompilerUtil

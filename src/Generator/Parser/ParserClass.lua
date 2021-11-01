@@ -208,30 +208,28 @@ function ParserClass:ParseIfStatement(cur)
     
     return { Name = "IfStatement", Value = {
         statements = statements
-    }, "Statement", Position = cur.Position }
+    }, Type = "Statement", Position = cur.Position }
 end
 
 function ParserClass:ParseForStatement(cur)
     local var = self:GetIdentifier(self.Head:GoNext())
-    self.Head:GoNext()
     
     -- Normal number for loop
-    if self.Head:Consume("=") then
-        
+    if self.Head:Current().Value == "=" then
+        self.Head:GoNext()
         local start, stop, iter
+        
         start = self:GetExpectedExpression()
         self.Head:Expect(",", "Expected , after for start!")
-        
         stop = self:GetExpectedExpression()
-        self.Head:GoNext()
+        
         if self.Head:Consume(",") then
             iter = self:GetExpectedExpression()
-            self.Head:GoNext()
         end
         
         self.Head:Expect("do", "Expected do after for!")
         local body = self:ParseBody()
-        self.Head:GoNextAndExpect("end", "Expected end after for!")
+        self.Head:Expect("end", "Expected end after for!")
         
         return { Name = "NumericForStatement", Value = {
             var = var,
