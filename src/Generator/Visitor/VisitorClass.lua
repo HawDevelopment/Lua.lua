@@ -52,7 +52,7 @@ end
 function VisitorClass:ReturnStatement(cur, toadd)
     
     for _, value in pairs(cur.Value) do
-        table.insert(toadd, self:Walk(value))
+        self:Walk(value, toadd)
     end
     table.insert(toadd, cur)
 end
@@ -69,19 +69,24 @@ function VisitorClass:FunctionStatement(cur, toadd)
     table.insert(toadd, cur)
 end
 
-function VisitorClass:CallStatement(cur, toadd)
-    if #cur.Value.Value.args > 1 then
-        for _, value in pairs(cur.Value.Value.args) do
-            self:Walk(value, toadd)
+function VisitorClass:CallExpression(cur, toadd)
+    if #cur.Value.args > 1 then
+        for i = #cur.Value.args, 1, -1 do
+            self:Walk(cur.Value.args[i], toadd)
             self:_instruction(toadd, "Push", "eax")
         end
-    elseif #cur.Value.Value.args == 1 then
-        self:Walk(cur.Value.Value.args[1], toadd)
+    elseif #cur.Value.args == 1 then
+        self:Walk(cur.Value.args[1], toadd)
+        self:_instruction(toadd, "Push", "eax")
     end
     
     
-    cur.Value = { name = cur.Value.Value.base.Value, args = cur.Value.Value.args }
+    cur.Value = { name = cur.Value.base.Value, args = cur.Value.args, islocal = cur.Value.islocal, argsnum = #cur.Value.args }
     table.insert(toadd, cur)
+end
+
+function VisitorClass:CallStatement(cur, toadd)
+    self:Walk(cur.Value, toadd)
 end
 
 -- TODO: Add suport for multiple inits
@@ -166,7 +171,9 @@ local NameToFunction = {
     
     AssignmentStatement = VisitorClass.AssignmentStatement,
     LocalStatement = VisitorClass.LocalStatement,
+    
     CallStatement = VisitorClass.CallStatement,
+    CallExpression = VisitorClass.CallExpression,
     
     IfStatement = VisitorClass.IfStatement,
     WhileStatement = VisitorClass.WhileStatement,

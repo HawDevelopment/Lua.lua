@@ -9,7 +9,7 @@ local LOG = false
 local TableHead = require("src.Generator.Util.TableHead")
 local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
 
-local PrintAssembly = "print:\n\tpush ebp\n\tmov ebp, esp\n\tpush edi\n\tpush print_number\n\tcall _printf\n\tmov eax, 0\n\tmov ecx, 0\n\tpop ebx\n\tpop ebx\n\tpop ebp\n\tret\n"
+local PrintAssembly = "print:\n\tpush ebp\n\tmov ebp, esp\n\tmov eax, [ebp + 8]\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tpop ebx\n\tpop ebx\n\tpop ebp\n\tret\n"
 local StartAssembly = "section .text\nglobal _main\nextern _printf\n" .. PrintAssembly .. "\n_main:\n"
 local FunctionsAssembly = ""
 local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0 ; Used for print"
@@ -29,6 +29,8 @@ function CompilerClass.new(visited, head, version)
     self.Util = CompilerUtil.new(self)
     
     self.GlobalEnv = { ["print"] = "print" }
+    self.GlobalDataEnv = { ["print"] = { numargs = 1}}
+    
     self.Envoriments = {}
     self.TopEnvoriment = 0
     
@@ -82,7 +84,7 @@ do
 end
 
 function CompilerClass:ReturnStatement(_)
-    return self.Util:Pop("ebp") .. "\tret"
+    return self.Util:Pop("ebp") .. "\tret\n"
 end
 
 -- TODO: Start support for: "a and b or c"
@@ -109,10 +111,10 @@ do
         ["=="] = "cmove", ["~="] = "cmovne",
         [">"] = "cmovg", [">="] = "cmovge",
         ["<"] = "cmovl", ["<="] = "cmovle",
-        ["or"] = "\tpop ecx\n\tpush eax\nmov eax, ecx\n\tcmp eax, 0\n\tje _%d\n\tmov eax, 1\n\tjmp _end%d\n",
-        ["and"] = "\tpop ecx\n\tpush eax\nmov eax, ecx\n\tcmp eax, 0\n\tjne _%d\n\tjmp _end%d\n"
+        ["or"] = "\tpop ecx\n\tpush eax\n\tmov eax, ecx\n\tcmp eax, 0\n\tje _%d\n\tmov eax, 1\n\tjmp _end%d\n",
+        ["and"] = "\tpop ecx\n\tpush eax\n\tmov eax, ecx\n\tcmp eax, 0\n\tjne _%d\n\tjmp _end%d\n"
     }
-    local LogicalString = "_%d:\npop eax\n\tcmp eax, 0\n\tsetne al\n\tjmp _end%d"
+    local LogicalString = "_%d:\n\tpop eax\n\tcmp eax, 0\n\tsetne al\n\tjmp _end%d"
     local EqualString = "\tmov ebx, 0\n\tmov edx, 1\n\tcmp ecx, eax\n\t%s ebx, edx\n\tmov eax, ebx"
 
     -- TODO: Add suport for more ops
@@ -158,7 +160,6 @@ function CompilerClass:AssignmentStatement(cur)
     return ("\tmov [ebp - %d], eax\n"):format(env[cur.Value.Value])
 end
 
-local ArgumentLookUp = { "edi", "esi", "edx", "ecx" }
 
 function CompilerClass:FunctionStatement(cur)
     Log("Creating function: " .. cur.Value.name)
@@ -167,19 +168,25 @@ function CompilerClass:FunctionStatement(cur)
     local env = self:GetEnv()
     env._ENV.EndName = hash
     
+    self.GlobalDataEnv[cur.Value.name] = { numargs = #cur.Value.params }
+
+    if not cur.Value.islocal then
+        Log("Added public function: " .. cur.Value.name)
+        self.GlobalEnv[cur.Value.name] = hash
+    end
+    
     local body = ""
     
     -- Args
     if #cur.Value.params > 0 then
-        if #cur.Value.params > 4 then
-            error("Too many arguments! (Will be fixed)")
-        end
-        
-        for key, value in pairs(cur.Value.params) do
+        local parampointer = 8
+        for _, value in pairs(cur.Value.params) do
             local pointer = env._ENV.Pointer
             env[value.Value] = pointer
             env._ENV.Pointer = pointer + 4
-            body = body .. ("\tmov [ebp - %d], %s\n"):format(pointer, ArgumentLookUp[key])
+            
+            body = body .. ("\tmov eax, [ebp + %d]\n\tmov [ebp - %d], eax\n"):format(parampointer, pointer)
+            parampointer = parampointer + 4
         end
     end
     
@@ -195,33 +202,28 @@ function CompilerClass:FunctionStatement(cur)
         error("Expected 'end'")
     end
     
-    Log("Added function: " .. cur.Value.name)
     self:RemoveEnv()
-    self.GlobalEnv[cur.Value.name] = hash
-    self:Function(("%s:\n\tpush ebp\n\tmov ebp, esp\n%s"):format(hash, body))
+    if cur.Value.islocal then
+        Log("Added local function: " .. cur.Value.name)
+        self.GlobalEnv[cur.Value.name] = hash
+    end
+    self:Function(("global %s\n%s:\n\tpush ebp\n\tmov ebp, esp\n%s"):format(hash, hash, body))
     return "\t; Create " .. cur.Value.name .. " function\n"
 end
 
-function CompilerClass:CallStatement(cur)
+function CompilerClass:CallExpression(cur)
     -- !THE VISITOR CREATES INSTRUCTIONS TO PUSH THE PARAMETERS!
     
     Log("Calling function: " .. cur.Value.name)
     if not self.GlobalEnv[cur.Value.name] then
         error("Attemp to call function '" .. tostring(cur.Value.name) .. "' (a nil value)")
     end
-    
-    local body = ""
-    if #cur.Value.args > 1 then
-        for i, _ in pairs(cur.Value.args) do
-            body = body .. self.Util:Pop("eax") .. self.Util:Mov(ArgumentLookUp[i], "eax")
-        end
-    else
-        local arg = cur.Value.args[1]
-        if arg then
-            body = body .. self.Util:Mov(ArgumentLookUp[1], "eax")
-        end
+    local data = self.GlobalDataEnv[cur.Value.name]
+    if data and data.numargs and data.numargs ~= cur.Value.argsnum then
+        error("Function " .. cur.Value.name .. " expects " .. data.numargs .. " arguments, got " .. cur.Value.argsnum)
     end
-    return ("%s\tsub esp, 4 ; Remove and it will break print!!!\n\tcall %s ; -- Call function %s\n"):format(body, self.GlobalEnv[cur.Value.name], cur.Value.name)
+    
+    return ("\tcall %s ; -- Call function %s\n\tadd esp, %d\n"):format(self.GlobalEnv[cur.Value.name], cur.Value.name, cur.Value.argsnum * 4)
 end
 
 -- If statement
@@ -236,7 +238,7 @@ do
         
         str = str .. CompareString:format(endpos)
         
-        for key, value in pairs(tab.body) do
+        for _, value in pairs(tab.body) do
             str = str .. self:Walk(value)
         end
         return str
@@ -252,7 +254,10 @@ do
                     -- If or elseif
                     local endpos = cur.Value[key + 1] and ("_else" .. name .. "_" .. key + 1) or ("_end" .. name)
                     str = str .. self:_genifstatement(value, endpos)
-                    str = str .. self.Util:Jmp("_end" .. name)
+                    
+                    if not value.body[#value.body].Name == "ReturnStatement" then
+                        str = str .. self.Util:Jmp("_end" .. name)
+                    end
                     
                     if cur.Value[key + 1] then
                         -- Add label for the next statement
@@ -262,7 +267,10 @@ do
                     for _, value in pairs(value.body) do
                         str = str .. self:Walk(value)
                     end
-                    str = str .. self.Util:Jmp("_end" .. name)
+                    
+                    if not value.body[#value.body].Name == "ReturnStatement" then
+                        str = str .. self.Util:Jmp("_end" .. name)
+                    end
                 end
             end
         else

@@ -1,6 +1,10 @@
 
-for i = 1, 10, 1 do
-    print(i)
+function Fib(n)
+    print(n)
+    return 1
 end
+
+local a = Fib(1)
+print(a)
 
 return

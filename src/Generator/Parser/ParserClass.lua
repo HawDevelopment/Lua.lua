@@ -142,21 +142,20 @@ function ParserClass:ParseReturnStatement(cur)
     cur = cur or self.Head:Current()
     
     local expressions = {}
-    if self.Head:Next() and self.Head:Next().Name ~= "end" then
+    if self.Head:Next() and self.Head:Next().Name == "end" then
+        self.Head:GoNext()
+    else
         self.Head:GoNext()
         while true do
-            local expression = self:GetExpectedExpression()
+            local expression = self:GetExpression(0)
             if not expression then
-                error("Expected expression")
+                break
             end
             table.insert(expressions, #expressions + 1, expression)
-            
             if not self.Head:Consume(",") then
                 break
             end
         end
-    else
-        self.Head:GoNext()
     end
     
     return { Name = "ReturnStatement", Value = expressions, Type = "Statement", Position = cur.Position }
@@ -551,8 +550,7 @@ end
 -- Sub expression
 function ParserClass:GetExpression(minprec)
     local op, expr = self.Head:Current(), nil
-    
-    if IsUnary(op.Value) then
+    if op and IsUnary(op.Value) then
         -- Unary expr
         self.Head:GoNext()
         -- 7 is the precedence of unary
@@ -640,7 +638,7 @@ function ParserClass:GetPrefixExpression(cur)
     cur = cur or self.Head:Current()
     local name, base
     
-    if cur.Type == "Identifier" then
+    if cur and cur.Type == "Identifier" then
         name = cur.Value
         base = self:GetIdentifier(cur)
     elseif self.Head:Consume("(") then
@@ -706,6 +704,9 @@ end
 
 function ParserClass:GetLiteral(cur)
     cur = cur or self.Head:Current()
+    if not cur then
+        return nil
+    end
     
     if cur.Type == "String" or cur.Type == "Number" or cur.Type == "Boolean" or cur.Name == "VarArgLiteral" or cur.Name == "NilLiteral" then
         self.Head:GoNext()
