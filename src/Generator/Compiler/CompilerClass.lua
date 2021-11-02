@@ -255,7 +255,7 @@ do
                     local endpos = cur.Value[key + 1] and ("_else" .. name .. "_" .. key + 1) or ("_end" .. name)
                     str = str .. self:_genifstatement(value, endpos)
                     
-                    if not value.body[#value.body].Name == "ReturnStatement" then
+                    if not value.body[#value.body].Name ~= "ReturnStatement" then
                         str = str .. self.Util:Jmp("_end" .. name)
                     end
                     
@@ -267,8 +267,7 @@ do
                     for _, value in pairs(value.body) do
                         str = str .. self:Walk(value)
                     end
-                    
-                    if not value.body[#value.body].Name == "ReturnStatement" then
+                    if not value.body[#value.body].Name ~= "ReturnStatement" then
                         str = str .. self.Util:Jmp("_end" .. name)
                     end
                 end
