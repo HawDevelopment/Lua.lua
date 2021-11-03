@@ -9,11 +9,6 @@ local LOG = false
 local TableHead = require("src.Generator.Util.TableHead")
 local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
 
-local PrintAssembly = "print:\n\tpush ebp\n\tmov ebp, esp\n\tmov eax, [ebp + 8]\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tpop ebx\n\tpop ebx\n\tpop ebp\n\tret\n"
-local StartAssembly = "section .text\nglobal _main\nextern _printf\n" .. PrintAssembly .. "\n_main:\n"
-local FunctionsAssembly = ""
-local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0 ; Used for print"
-
 local CompilerClass = {}
 CompilerClass.__index = CompilerClass
 
@@ -21,9 +16,9 @@ function CompilerClass.new(visited, head, version)
     local self = setmetatable({}, CompilerClass)
     
     self.File = {
-        Start = StartAssembly,
-        Function = FunctionsAssembly,
-        End = EndAssembly
+        Start = { },
+        Function = { },
+        End = { }
     }
     
     self.Util = CompilerUtil.new(self)
@@ -84,7 +79,7 @@ do
 end
 
 function CompilerClass:ReturnStatement(_)
-    return self.Util:Pop("ebp") .. "\tret\n"
+    return self.Util:Text("\tpop ebp\n\tret\n")
 end
 
 -- TODO: Start support for: "a and b or c"
@@ -92,9 +87,12 @@ function CompilerClass:UnaryExpression(cur)
     -- Evaluate the expression
     local op = cur.Value.op.Value
     if op == "-" then
-        return "\tneg eax ; Unary\n"
+        return self.Util:Neg(self.Util.Eax)
     elseif op == "not" then
-        return "\tcmp eax, 0\n\tmov eax, 0\n\tsete al\n"
+        return { self.Util:Cmp(self.Util.Eax, self.Util:Text("0")),
+            self.Util:Mov(self.Util.Eax, self.Util:Text("0")),
+            self.Util:Text("\tsete al\n")
+        }
     else
         print("Unary with name: " .. tostring(op) .. " not found!")
     end
@@ -102,39 +100,38 @@ end
 
 -- Binary
 do
-    local OpToString = {
-        ["+"] = "\tadd eax, ecx",
-        ["*"] = "\timul eax, ecx",
-        ["-"] = "\tsub ecx, eax\n\tmov eax, ecx\n",
-        ["/"] = "\tmov ebx, eax\n\tmov eax, ecx\n\tmov ecx, ebx\n\tcdq\n\tidiv ecx\n",
-        ["%"] = "\tmov ebx, eax\n\tmov eax, ecx\n\tmov ecx, ebx\n\tcdq\n\tidiv ecx\n\tmov eax, edx\n",
-        ["=="] = "cmove", ["~="] = "cmovne",
-        [">"] = "cmovg", [">="] = "cmovge",
-        ["<"] = "cmovl", ["<="] = "cmovle",
-        ["or"] = "\tpop ecx\n\tpush eax\n\tmov eax, ecx\n\tcmp eax, 0\n\tje _%d\n\tmov eax, 1\n\tjmp _end%d\n",
-        ["and"] = "\tpop ecx\n\tpush eax\n\tmov eax, ecx\n\tcmp eax, 0\n\tjne _%d\n\tjmp _end%d\n"
-    }
+    function CompilerUtil:_genOps()
+        self._optorender = {
+            ["+"] = self.Util:Add(self.Util.Eax, self.Util.Ecx),
+            ["*"] = self.Util:Mul(self.Util.Eax, self.Util.Ecx),
+            ["-"] = { self.Util:Sub(self.Util.Ecx, self.Util.Eax), self.Util:Mov(self.Util.Eax, self.Util.Ecx) },
+            ["/"] = self.Util:Div(self.Util.Eax, self.Util.Ecx),
+            ["%"] = { self.Util:Div(self.Util.Eax, self.Util.Ecx), self.Util:Mov(self.Util.Eax, self.Util.Edx) },
+            ["=="] = "cmove", ["~="] = "cmovne",
+            [">"] = "cmovg", [">="] = "cmovge",
+            ["<"] = "cmovl", ["<="] = "cmovle",
+            ["or"] = self.Util:Or(self.Util.Eax, self.Util.Ecx),
+            ["and"] = self.Util:And(self.Util.Eax, self.Util.Ecx)
+        }
+    end
+    
     local LogicalString = "_%d:\n\tpop eax\n\tcmp eax, 0\n\tsetne al\n\tjmp _end%d"
     local EqualString = "\tmov ebx, 0\n\tmov edx, 1\n\tcmp ecx, eax\n\t%s ebx, edx\n\tmov eax, ebx"
 
     -- TODO: Add suport for more ops
     function CompilerClass:BinaryExpression(cur)
         local op, pos = cur.Value, self.Head.Pos
-        local str = assert(OpToString[op], "The operator: " .. op .. " is not a valid operator!")
+        local str = assert(self._optorender[op], "The operator: " .. op .. " is not a valid operator!")
 
         if self.Version.LOGICAL_OPERATORS[op] then
             -- and, or
-            self:Function(LogicalString:format(pos, pos))
-            return str:format(pos, pos) .. "\n_end" .. pos .. ":\n"
-
+            return self._optorender[op]
         elseif self.Version.EQUALITY_OPERATORS[op] or self.Version.COMPARISON_OPERATORS[op] then
             -- ==, ~=, >, >=, <, <=
-            str = EqualString:format(str, pos, pos)
-            -- return "\tpop ebx\n" .. str .. "\n" -- Same as below
+            return self.Util:Equal(self._optorender[op])
         end
-        
         -- Binary
-        return "\tpop ecx\n" .. str .. "\n"
+        return self._optorender[op]
     end
 end
 
@@ -148,7 +145,7 @@ function CompilerClass:GetLocalExpression(cur)
     if not env[cur.Value] then
         error("Attemp to acces local '" .. tostring(cur.Value) .. "' (a nil value)")
     end
-    return ("\tmov eax, [ebp - %d]\n"):format(self:GetEnv()[cur.Value])
+    return self.Util:Mov(self.Util.Eax, self.Util:_local("[ebp - " .. env[cur.Value] .. "]"))
 end
 
 function CompilerClass:AssignmentStatement(cur)
@@ -157,7 +154,7 @@ function CompilerClass:AssignmentStatement(cur)
     if not env[cur.Value.Value] then
         error("Attemp to assign to local '" .. tostring(cur.Value.Value) .. "' (a nil value)")
     end
-    return ("\tmov [ebp - %d], eax\n"):format(env[cur.Value.Value])
+    return self.Util:Mov(self.Util:_local("[ebp - " .. env[cur.Value] .. "]"), self.Util.Eax)
 end
 
 
@@ -175,7 +172,7 @@ function CompilerClass:FunctionStatement(cur)
         self.GlobalEnv[cur.Value.name] = hash
     end
     
-    local body = ""
+    local body = { }
     
     -- Args
     if #cur.Value.params > 0 then
@@ -184,14 +181,16 @@ function CompilerClass:FunctionStatement(cur)
             local pointer = env._ENV.Pointer
             env[value.Value] = pointer
             env._ENV.Pointer = pointer + 4
-            
-            body = body .. ("\tmov eax, [ebp + %d]\n\tmov [ebp - %d], eax\n"):format(parampointer, pointer)
+            table.insert(body, {
+                self.Util:Mov(self.Util.Eax, self.Util:_param("[ebp + " .. parampointer .. "]")),
+                self.Util:Mov(self.Util:_local("[ebp - " .. pointer .. "]"), self.Util.Eax)
+            })
             parampointer = parampointer + 4
         end
     end
     
     for _, value in pairs(cur.Value.body) do
-        body = body .. self:Walk(value)
+        table.insert(body, self:Walk(value))
     end
     if cur.Value.body[#cur.Value.body].Name ~= "ReturnStatement" then
         error("Function " .. cur.Value.name .. " does not return have a return statement!")
