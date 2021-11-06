@@ -35,9 +35,9 @@ function CompilerUtil:Pop(cur)
     return { Name = "Pop", Value = cur }
 end
 
-function CompilerUtil:Jmp(cur, cur2)
+function CompilerUtil:Jmp(cur)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Jmp", Value = { cur, cur2 } }
+    return { Name = "Jmp", Value = cur }
 end
 
 function CompilerUtil:Mov(cur, cur2)

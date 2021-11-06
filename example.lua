@@ -1,11 +1,8 @@
 
-function Fib(m)
-    if m < 2 then
-        return m
-    else
-        return Fib(m - 1) + Fib(m - 2)
-    end
+local b = 0
+for i = 0, 100, 1 do
+    b = b + 1
 end
-print(Fib(10))
+print(b)
 
 return

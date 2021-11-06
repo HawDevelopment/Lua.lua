@@ -202,10 +202,6 @@ function CompilerClass:FunctionStatement(cur)
         error("Expected 'end'")
     end
     
-    -- Vars
-    
-    
-    
     self:RemoveEnv()
     if cur.Value.islocal then
         Log("Added local function: " .. cur.Value.name)
@@ -290,67 +286,76 @@ end
 do
     -- local WhileCompareString = "\tcmp eax, 1\n\tjne %s\n"
     function CompilerClass:WhileStatement(cur)
-        error("Not implemented!")
-        -- local str = ""
-        -- local name = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
-        -- local endpos = "_end" .. name
+        local name = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
+        local endpos = "_end" .. name
+        local body = {}
         
-        -- str = str .. self.Util:Label(name)
-        -- for _, value in pairs(cur.Value.condition) do
-        --     str = str .. self:Walk(value)
-        -- end
-        -- str = str .. WhileCompareString:format(endpos)
-        -- for _, value in pairs(cur.Value.body) do
-        --     if value.Name == "BreakStatement" then
-        --         str = str .. self.Util:Jmp(endpos)
-        --     else
-        --         str = str .. self:Walk(value)
-        --     end
-        -- end
-        -- str = str .. self.Util:Jmp(name)
-        -- str = str .. self.Util:Label(endpos)
-        -- return str
+        table.insert(body, self.Util:Label(name))
+        for _, value in pairs(cur.Value.condition) do
+            table.insert(body, self:Walk(value))
+        end
+        
+        -- Compare
+        table.insert(body, {
+            self.Util:Cmp(self.Util.Eax, self.Util:Text("1")),
+            self.Util:Text("\tjne " .. endpos .. "\n")
+        })
+        for _, value in pairs(cur.Value.body) do
+            if value.Name == "BreakStatement" then
+                table.insert(body, self.Util:Jmp(self.Util:Text(endpos)))
+            else
+                table.insert(body, self:Walk(value))
+            end
+        end
+        
+        table.insert(body, self.Util:Jmp(self.Util:Text(name)))
+        table.insert(body, self.Util:Label(endpos))
+        return body
     end
     
     -- local ForCompareString = "\tcmp %s, %s\n\tjl %s\n"
     function CompilerClass:NumericForStatement(cur)
-        error("Not implemented!")
-        -- local name = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
-        -- local endpos = "_end" .. name
-        -- local env = self:GetEnv()
+        local name = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
+        local endpos = "_end" .. name
+        local env = self:GetEnv()
         
-        -- local str = ""
-        -- for _, value in pairs(cur.Value.start) do
-        --     str = str .. self:Walk(value)
-        -- end
-        -- str = str .. self.Util:LocalVariable(cur.Value.var.Value)
-        -- for _, value in pairs(cur.Value.stop) do
-        --     str = str .. self:Walk(value)
-        -- end
-        -- str = str .. self.Util:LocalVariable("__iter")
+        local body = {}
+        for _, value in pairs(cur.Value.start) do
+            table.insert(body, self:Walk(value))
+        end
+        table.insert(body, self.Util:LocalVariable(cur.Value.var.Value))
+        for _, value in pairs(cur.Value.stop) do
+            table.insert(body, self:Walk(value))
+        end
+        table.insert(body, self.Util:LocalVariable("__iter"))
+        table.insert(body,self.Util:Label(name))
         
-        -- str = str .. self.Util:Label(name)
+        local var = self.Util:_local("[ebp - " .. env[cur.Value.var.Value] .. "]")
+        local stop = self.Util:_local("[ebp - " .. env["__iter"] .. "]")
+        table.insert(body, {
+            self.Util:Mov(self.Util.Eax, var),
+            self.Util:Mov(self.Util.Ebx, stop),
+            
+            self.Util:Cmp(self.Util.Ebx, self.Util.Eax),
+            self.Util:Text("\tjle " .. endpos .. "\n")
+        })
+        for _, value in pairs(cur.Value.body) do
+            if value.Name == "BreakStatement" then
+                table.insert(body, self.Util:Jmp(endpos))
+            else
+                table.insert(body, self:Walk(value))
+            end
+        end
         
-        -- local varassembly = "[ebp - " .. env[cur.Value.var.Value] .. "]"
-        -- local stopassembly = "[ebp - " .. env["__iter"] .. "]"
-        -- str = str .. self.Util:Mov(self.Util.Eax, varassembly)
-        -- str = str .. self.Util:Mov(self.Util.Ebx, stopassembly)
-        -- str = str .. ForCompareString:format("ebx", "eax", endpos)
-        -- for _, value in pairs(cur.Value.body) do
-        --     if value.Name == "BreakStatement" then
-        --         str = str .. self.Util:Jmp(endpos)
-        --     else
-        --         str = str .. self:Walk(value)
-        --     end
-        -- end
+        table.insert(body, {
+            self.Util:Mov(self.Util.Eax, var),
+            self.Util:Add(self.Util.Eax, self.Util:Text("1")),
+            self.Util:Mov(var, self.Util.Eax)
+        })
         
-        
-        -- str = str .. self.Util:Add(varassembly, "1")
-        -- str = str .. self.Util:Mov(varassembly, "eax")
-        
-        -- str = str .. self.Util:Jmp(name)
-        -- str = str .. self.Util:Label(endpos)
-        -- return str
+        table.insert(body, self.Util:Jmp(self.Util:Text(name)))
+        table.insert(body, self.Util:Label(endpos))
+        return body
     end
 end
 
@@ -374,11 +379,26 @@ end
 function CompilerClass:Run()
     self:_genOps()
     self:CreateEnv()
+    local env = self:GetEnv()
+    env.EndName = GetHash(self)
+    
     self.Pointer = 4
     
     while self.Head:GoNext() do
         table.insert(self.File.Start, self:Walk(self.Head:Current()))
     end
+    
+    env = self:GetEnv()
+    if env.EndName ~= GetHash(self) then
+        error("Expected 'end'")
+    end
+    
+    local vars = env._ENV.NumVars * 4
+    table.insert(self.File.Start, 1, self.Util:Text("\tsub esp, " .. vars .. "\n"))
+    if self.Head:Last().Name ~= "ReturnStatement" then
+        table.insert(self.File.Start, self:ReturnStatement())
+    end
+    
     
     return self.File
 end
