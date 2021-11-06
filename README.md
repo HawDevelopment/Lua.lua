@@ -6,7 +6,7 @@ Current progress:
 
 -   ✔ Lexer
 -   ✔ Parser
--   ❌ Full code covrage
+-   ❌ Full test covrage
 -   ⚒ Compiler
 -   ❌ Interpreter
 
