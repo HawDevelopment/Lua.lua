@@ -4,3 +4,6 @@
 [submodule "vendor/bee.lua"]
 	path = vendor/bee.lua
 	url = https://github.com/actboy168/bee.lua
+[submodule "vendor/lunar"]
+	path = vendor/lunar
+	url = https://github.com/HawDevelopment/LunarTesting.git
