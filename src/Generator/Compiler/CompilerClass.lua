@@ -9,11 +9,6 @@ local LOG = false
 local TableHead = require("src.Generator.Util.TableHead")
 local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
 
-local PrintAssembly = "print:\n\tpush ebp\n\tmov ebp, esp\n\tmov eax, [ebp + 8]\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tpop ebx\n\tpop ebx\n\tpop ebp\n\tret\n"
-local StartAssembly = "section .text\nglobal _main\nextern _printf\n" .. PrintAssembly .. "\n_main:\n"
-local FunctionsAssembly = ""
-local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0 ; Used for print"
-
 local CompilerClass = {}
 CompilerClass.__index = CompilerClass
 
@@ -21,9 +16,9 @@ function CompilerClass.new(visited, head, version)
     local self = setmetatable({}, CompilerClass)
     
     self.File = {
-        Start = StartAssembly,
-        Function = FunctionsAssembly,
-        End = EndAssembly
+        Start = { },
+        Function = { },
+        End = { }
     }
     
     self.Util = CompilerUtil.new(self)
@@ -52,27 +47,14 @@ local function GetHash(cur)
 end
 
 -- Util
+
 do
-    local function AddToAny(self, index, toadd)
-        if toadd then
-            self.File[index] = self.File[index] .. toadd .. "\n"
-        else
-            error("Tried to add nil to index: " .. index)
-        end
+    function CompilerClass:Add(pos, toadd)
+        self.File[pos] = toadd
     end
-    function CompilerClass:Start(...)
-        AddToAny(self, "Start", ...)
-    end
-    function CompilerClass:End(...)
-        AddToAny(self, "End", ...)
-    end
-    function CompilerClass:Function(...)
-        AddToAny(self, "Function", ...)
-    end
-    
     function CompilerClass:CreateEnv()
         self.TopEnvoriment = self.TopEnvoriment + 1
-        self.Envoriments[self.TopEnvoriment] = { _ENV = { Pointer = 4 } }
+        self.Envoriments[self.TopEnvoriment] = { _ENV = { Pointer = 4, NumVars = 0 } }
     end
     function CompilerClass:RemoveEnv()
         self.Envoriments[self.TopEnvoriment] = nil
@@ -84,7 +66,8 @@ do
 end
 
 function CompilerClass:ReturnStatement(_)
-    return self.Util:Pop("ebp") .. "\tret\n"
+    local env = self:GetEnv()
+    return self.Util:Text("\tadd esp, " .. env._ENV.NumVars * 4 .. "\n\tpop ebp\n\tret\n")
 end
 
 -- TODO: Start support for: "a and b or c"
@@ -92,9 +75,12 @@ function CompilerClass:UnaryExpression(cur)
     -- Evaluate the expression
     local op = cur.Value.op.Value
     if op == "-" then
-        return "\tneg eax ; Unary\n"
+        return self.Util:Neg(self.Util.Eax)
     elseif op == "not" then
-        return "\tcmp eax, 0\n\tmov eax, 0\n\tsete al\n"
+        return { self.Util:Cmp(self.Util.Eax, self.Util:Text("0")),
+            self.Util:Mov(self.Util.Eax, self.Util:Text("0")),
+            self.Util:Text("\tsete al\n")
+        }
     else
         print("Unary with name: " .. tostring(op) .. " not found!")
     end
@@ -102,39 +88,40 @@ end
 
 -- Binary
 do
-    local OpToString = {
-        ["+"] = "\tadd eax, ecx",
-        ["*"] = "\timul eax, ecx",
-        ["-"] = "\tsub ecx, eax\n\tmov eax, ecx\n",
-        ["/"] = "\tmov ebx, eax\n\tmov eax, ecx\n\tmov ecx, ebx\n\tcdq\n\tidiv ecx\n",
-        ["%"] = "\tmov ebx, eax\n\tmov eax, ecx\n\tmov ecx, ebx\n\tcdq\n\tidiv ecx\n\tmov eax, edx\n",
-        ["=="] = "cmove", ["~="] = "cmovne",
-        [">"] = "cmovg", [">="] = "cmovge",
-        ["<"] = "cmovl", ["<="] = "cmovle",
-        ["or"] = "\tpop ecx\n\tpush eax\n\tmov eax, ecx\n\tcmp eax, 0\n\tje _%d\n\tmov eax, 1\n\tjmp _end%d\n",
-        ["and"] = "\tpop ecx\n\tpush eax\n\tmov eax, ecx\n\tcmp eax, 0\n\tjne _%d\n\tjmp _end%d\n"
-    }
-    local LogicalString = "_%d:\n\tpop eax\n\tcmp eax, 0\n\tsetne al\n\tjmp _end%d"
-    local EqualString = "\tmov ebx, 0\n\tmov edx, 1\n\tcmp ecx, eax\n\t%s ebx, edx\n\tmov eax, ebx"
+    function CompilerClass:_genOps()
+        -- ! WE SHOULD ALWAYS USE EAX AND ECX !
+        self._optorender = {
+            ["+"] = self.Util:Add(self.Util.Eax, self.Util.Ecx),
+            ["*"] = self.Util:Mul(self.Util.Eax, self.Util.Ecx),
+            ["-"] = self.Util:Sub(self.Util.Ecx, self.Util.Eax),
+            ["/"] = self.Util:Div(self.Util.Eax, self.Util.Ecx),
+            ["%"] = { self.Util:Div(self.Util.Eax, self.Util.Ecx), self.Util:Mov(self.Util.Eax, self.Util.Edx) },
+            ["=="] = "sete", ["~="] = "setne",
+            [">"] = "setg", [">="] = "setge",
+            ["<"] = "setl", ["<="] = "setle",
+            ["or"] = self.Util:Or(self.Util.Eax, self.Util.Ecx),
+            ["and"] = self.Util:And(self.Util.Eax, self.Util.Ecx)
+        }
+    end
 
     -- TODO: Add suport for more ops
     function CompilerClass:BinaryExpression(cur)
-        local op, pos = cur.Value, self.Head.Pos
-        local str = assert(OpToString[op], "The operator: " .. op .. " is not a valid operator!")
+        local op = cur.Value
+        assert(self._optorender[op], "The operator: " .. op .. " is not a valid operator!")
 
+        local toret
         if self.Version.LOGICAL_OPERATORS[op] then
             -- and, or
-            self:Function(LogicalString:format(pos, pos))
-            return str:format(pos, pos) .. "\n_end" .. pos .. ":\n"
-
+            toret = self._optorender[op]
         elseif self.Version.EQUALITY_OPERATORS[op] or self.Version.COMPARISON_OPERATORS[op] then
             -- ==, ~=, >, >=, <, <=
-            str = EqualString:format(str, pos, pos)
-            -- return "\tpop ebx\n" .. str .. "\n" -- Same as below
+            toret = self.Util:Equal(self._optorender[op])
+        else
+            -- Binary
+            
+            toret = self._optorender[op]
         end
-        
-        -- Binary
-        return "\tpop ecx\n" .. str .. "\n"
+        return toret
     end
 end
 
@@ -148,7 +135,7 @@ function CompilerClass:GetLocalExpression(cur)
     if not env[cur.Value] then
         error("Attemp to acces local '" .. tostring(cur.Value) .. "' (a nil value)")
     end
-    return ("\tmov eax, [ebp - %d]\n"):format(self:GetEnv()[cur.Value])
+    return self.Util:Mov(self.Util.Eax, self.Util:_local("[ebp - " .. env[cur.Value] .. "]"))
 end
 
 function CompilerClass:AssignmentStatement(cur)
@@ -157,7 +144,7 @@ function CompilerClass:AssignmentStatement(cur)
     if not env[cur.Value.Value] then
         error("Attemp to assign to local '" .. tostring(cur.Value.Value) .. "' (a nil value)")
     end
-    return ("\tmov [ebp - %d], eax\n"):format(env[cur.Value.Value])
+    return self.Util:Mov(self.Util:_local("[ebp - " .. env[cur.Value.Value] .. "]"), self.Util.Eax)
 end
 
 
@@ -166,8 +153,8 @@ function CompilerClass:FunctionStatement(cur)
     local hash = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
     self:CreateEnv()
     local env = self:GetEnv()
-    env._ENV.EndName = hash
     
+    env._ENV.EndName = hash
     self.GlobalDataEnv[cur.Value.name] = { numargs = #cur.Value.params }
 
     if not cur.Value.islocal then
@@ -175,7 +162,13 @@ function CompilerClass:FunctionStatement(cur)
         self.GlobalEnv[cur.Value.name] = hash
     end
     
-    local body = ""
+    local body = { }
+    
+    -- Label
+    table.insert(body, 1, {
+        self.Util:Text("global " .. hash .. "\n"),
+        self.Util:AdvLabel(hash)
+    })
     
     -- Args
     if #cur.Value.params > 0 then
@@ -184,20 +177,27 @@ function CompilerClass:FunctionStatement(cur)
             local pointer = env._ENV.Pointer
             env[value.Value] = pointer
             env._ENV.Pointer = pointer + 4
-            
-            body = body .. ("\tmov eax, [ebp + %d]\n\tmov [ebp - %d], eax\n"):format(parampointer, pointer)
+            table.insert(body, {
+                self.Util:Mov(self.Util.Eax, self.Util:_param("[ebp + " .. parampointer .. "]")),
+                self.Util:Mov(self.Util:_local("[ebp - " .. pointer .. "]"), self.Util.Eax)
+            })
             parampointer = parampointer + 4
+            env._ENV.NumVars = env._ENV.NumVars + 1
         end
     end
     
     for _, value in pairs(cur.Value.body) do
-        body = body .. self:Walk(value)
-    end
-    if cur.Value.body[#cur.Value.body].Name ~= "ReturnStatement" then
-        error("Function " .. cur.Value.name .. " does not return have a return statement!")
+        table.insert(body, self:Walk(value))
     end
     
-    env = self:GetEnv()
+    local vars = env._ENV.NumVars * 4
+    table.insert(body, 2, self.Util:Text("\tsub esp, " .. vars .. "\n"))
+    
+    if cur.Value.body[#cur.Value.body].Name ~= "ReturnStatement" then
+        table.insert(body, self:ReturnStatement())
+    end
+    
+    env = self:GetEnv() -- Fetch env again, since it could have changed
     if env._ENV.EndName ~= hash then
         error("Expected 'end'")
     end
@@ -207,146 +207,157 @@ function CompilerClass:FunctionStatement(cur)
         Log("Added local function: " .. cur.Value.name)
         self.GlobalEnv[cur.Value.name] = hash
     end
-    self:Function(("global %s\n%s:\n\tpush ebp\n\tmov ebp, esp\n%s"):format(hash, hash, body))
-    return "\t; Create " .. cur.Value.name .. " function\n"
+    
+    self:Add("Function", body)
+    return self.Util:Text("\t; Created function " .. cur.Value.name .. " \n")
 end
 
 function CompilerClass:CallExpression(cur)
     -- !THE VISITOR CREATES INSTRUCTIONS TO PUSH THE PARAMETERS!
     
-    Log("Calling function: " .. cur.Value.name)
-    if not self.GlobalEnv[cur.Value.name] then
-        error("Attemp to call function '" .. tostring(cur.Value.name) .. "' (a nil value)")
+    local name = assert(cur.Value.name, "Attemted to call unknown function")
+    Log("Calling function: " .. name)
+    if not self.GlobalEnv[name] then
+        error("Attemp to call function '" .. tostring(name) .. "' (a nil value)")
     end
-    local data = self.GlobalDataEnv[cur.Value.name]
+    local data = self.GlobalDataEnv[name]
     if data and data.numargs and data.numargs ~= cur.Value.argsnum then
-        error("Function " .. cur.Value.name .. " expects " .. data.numargs .. " arguments, got " .. cur.Value.argsnum)
+        error("Function " .. name .. " expects " .. data.numargs .. " arguments, got " .. cur.Value.argsnum)
     end
-    
-    return ("\tcall %s ; -- Call function %s\n\tadd esp, %d\n"):format(self.GlobalEnv[cur.Value.name], cur.Value.name, cur.Value.argsnum * 4)
+    return {
+        self.Util:Text(("\tcall %s ; Call function %s\n"):format(self.GlobalEnv[name], name)),
+        self.Util:Add(self.Util.Esp, self.Util:Text(tostring(cur.Value.argsnum * 4)))
+    }
 end
 
 -- If statement
 do
-    local CompareString = "\tcmp eax, 1\n\tjne %s\n"
-    
     function CompilerClass:_genifstatement(tab, endpos)
-        local str = ""
+        local body = {}
         for _, value in pairs(tab.condition) do
-            str = str .. self:Walk(value)
+            table.insert(body, self:Walk(value))
         end
         
-        str = str .. CompareString:format(endpos)
+        table.insert(body, {
+            self.Util:Cmp(self.Util.Eax, self.Util:Text("1")),
+            self.Util:Text("\tjne " .. endpos .. "\n")
+        })
         
         for _, value in pairs(tab.body) do
-            str = str .. self:Walk(value)
+            table.insert(body, self:Walk(value))
         end
-        return str
+        return body
     end
     
     function CompilerClass:IfStatement(cur)
         local name = GetHash(cur)
-        local str = ""
-        if #cur.Value > 1 then
-            -- theres also some elseif or else statements
-            for key, value in pairs(cur.Value) do
-                if #value.condition > 0 then
-                    -- If or elseif
-                    local endpos = cur.Value[key + 1] and ("_else" .. name .. "_" .. key + 1) or ("_end" .. name)
-                    str = str .. self:_genifstatement(value, endpos)
-                    
-                    if not value.body[#value.body].Name ~= "ReturnStatement" then
-                        str = str .. self.Util:Jmp("_end" .. name)
-                    end
-                    
-                    if cur.Value[key + 1] then
-                        -- Add label for the next statement
-                        str = str .. self.Util:Label(endpos)
-                    end
-                else
-                    for _, value in pairs(value.body) do
-                        str = str .. self:Walk(value)
-                    end
-                    if not value.body[#value.body].Name ~= "ReturnStatement" then
-                        str = str .. self.Util:Jmp("_end" .. name)
-                    end
+        local body = {}
+        
+        for key, value in pairs(cur.Value) do
+            if #value.condition > 0 then
+                -- If or elseif
+                local endpos = cur.Value[key + 1] and ("_else" .. name .. "_" .. key + 1) or ("_end" .. name)
+                table.insert(body, self:_genifstatement(value, endpos))
+                
+                if not value.body[#value.body].Name ~= "ReturnStatement" then
+                    table.insert(body, self.Util:Jmp(self.Util:Text("_end" .. name)))
+                end
+                
+                if cur.Value[key + 1] then
+                    -- Add label for the next statement
+                    table.insert(body, self.Util:Label(endpos))
+                end
+            else
+                for _, value in pairs(value.body) do
+                    table.insert(body, self:Walk(value))
+                end
+                if not value.body[#value.body].Name ~= "ReturnStatement" then
+                    table.insert(body, self.Util:Jmp(self.Util:Text("_end" .. name)))
                 end
             end
-        else
-            str = self:_genifstatement(cur.Value[1], "_end" .. name)
         end
-        str = str .. self.Util:Label("_end" .. name)
-        return str
+        
+        table.insert(body, self.Util:Label("_end" .. name))
+        return body
     end
 end
 
 -- Loop statement
 do
-    local WhileCompareString = "\tcmp eax, 1\n\tjne %s\n"
+    -- local WhileCompareString = "\tcmp eax, 1\n\tjne %s\n"
     function CompilerClass:WhileStatement(cur)
-        local str = ""
         local name = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
         local endpos = "_end" .. name
+        local body = {}
         
-        str = str .. self.Util:Label(name)
+        table.insert(body, self.Util:Label(name))
         for _, value in pairs(cur.Value.condition) do
-            str = str .. self:Walk(value)
+            table.insert(body, self:Walk(value))
         end
-        str = str .. WhileCompareString:format(endpos)
+        
+        -- Compare
+        table.insert(body, {
+            self.Util:Cmp(self.Util.Eax, self.Util:Text("1")),
+            self.Util:Text("\tjne " .. endpos .. "\n")
+        })
         for _, value in pairs(cur.Value.body) do
             if value.Name == "BreakStatement" then
-                str = str .. self.Util:Jmp(endpos)
+                table.insert(body, self.Util:Jmp(self.Util:Text(endpos)))
             else
-                str = str .. self:Walk(value)
+                table.insert(body, self:Walk(value))
             end
         end
-        str = str .. self.Util:Jmp(name)
-        str = str .. self.Util:Label(endpos)
-        return str
+        
+        table.insert(body, self.Util:Jmp(self.Util:Text(name)))
+        table.insert(body, self.Util:Label(endpos))
+        return body
     end
     
-    local ForCompareString = "\tcmp %s, %s\n\tjl %s\n"
+    -- local ForCompareString = "\tcmp %s, %s\n\tjl %s\n"
     function CompilerClass:NumericForStatement(cur)
         local name = "_" .. GetHash(cur) -- We add an underscore so nasm doesn't complain
         local endpos = "_end" .. name
         local env = self:GetEnv()
         
-        local str = ""
+        local body = {}
         for _, value in pairs(cur.Value.start) do
-            str = str .. self:Walk(value)
+            table.insert(body, self:Walk(value))
         end
-        str = str .. self.Util:LocalVariable(cur.Value.var.Value)
+        table.insert(body, self.Util:LocalVariable(cur.Value.var.Value))
         for _, value in pairs(cur.Value.stop) do
-            str = str .. self:Walk(value)
+            table.insert(body, self:Walk(value))
         end
-        str = str .. self.Util:LocalVariable("__iter")
+        table.insert(body, self.Util:LocalVariable("__iter"))
+        table.insert(body,self.Util:Label(name))
         
-        str = str .. self.Util:Label(name)
-        
-        local varassembly = "[ebp - " .. env[cur.Value.var.Value] .. "]"
-        local stopassembly = "[ebp - " .. env["__iter"] .. "]"
-        str = str .. self.Util:Mov("eax", varassembly)
-        str = str .. self.Util:Mov("ebx", stopassembly)
-        str = str .. ForCompareString:format("ebx", "eax", endpos)
+        local var = self.Util:_local("[ebp - " .. env[cur.Value.var.Value] .. "]")
+        local stop = self.Util:_local("[ebp - " .. env["__iter"] .. "]")
+        table.insert(body, {
+            self.Util:Mov(self.Util.Eax, var),
+            self.Util:Mov(self.Util.Ebx, stop),
+            
+            self.Util:Cmp(self.Util.Ebx, self.Util.Eax),
+            self.Util:Text("\tjle " .. endpos .. "\n")
+        })
         for _, value in pairs(cur.Value.body) do
             if value.Name == "BreakStatement" then
-                str = str .. self.Util:Jmp(endpos)
+                table.insert(body, self.Util:Jmp(endpos))
             else
-                str = str .. self:Walk(value)
+                table.insert(body, self:Walk(value))
             end
         end
         
+        table.insert(body, {
+            self.Util:Mov(self.Util.Eax, var),
+            self.Util:Add(self.Util.Eax, self.Util:Text("1")),
+            self.Util:Mov(var, self.Util.Eax)
+        })
         
-        str = str .. self.Util:Add(varassembly, "1")
-        str = str .. self.Util:Mov(varassembly, "eax")
-        
-        str = str .. self.Util:Jmp(name)
-        str = str .. self.Util:Label(endpos)
-        return str
+        table.insert(body, self.Util:Jmp(self.Util:Text(name)))
+        table.insert(body, self.Util:Label(endpos))
+        return body
     end
 end
-
-
 
 function CompilerClass:Walk(cur)
     cur = cur or self.Head:GoNext()
@@ -354,10 +365,8 @@ function CompilerClass:Walk(cur)
     if cur == nil then
         return "nil"
     else
-        if cur.Type == "Instruction" then
-            local tocall = assert(self.Util[cur.Name], "Could not find intruction with name: " .. tostring(cur.Name))
-            if cur.Value then return tocall(self.Util, unpack(cur.Value)) end
-            return tocall(self.Util)
+        if cur.Name == "Instruction" then
+            return cur.Value
         end
         local tocall = self[cur.Name]
         if not tocall then
@@ -368,14 +377,30 @@ function CompilerClass:Walk(cur)
 end
 
 function CompilerClass:Run()
+    self:_genOps()
     self:CreateEnv()
+    local env = self:GetEnv()
+    env.EndName = GetHash(self)
+    
     self.Pointer = 4
     
     while self.Head:GoNext() do
-        self.File.Start = self.File.Start .. self:Walk(self.Head:Current())
+        table.insert(self.File.Start, self:Walk(self.Head:Current()))
     end
     
-    return (self.File.Start .. "\n" .. self.File.Function .. "\n" .. self.File.End):gsub("\t", "   ")
+    env = self:GetEnv()
+    if env.EndName ~= GetHash(self) then
+        error("Expected 'end'")
+    end
+    
+    local vars = env._ENV.NumVars * 4
+    table.insert(self.File.Start, 1, self.Util:Text("\tsub esp, " .. vars .. "\n"))
+    if self.Head:Last().Name ~= "ReturnStatement" then
+        table.insert(self.File.Start, self:ReturnStatement())
+    end
+    
+    
+    return self.File
 end
 
 

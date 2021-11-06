@@ -17,37 +17,99 @@ function CompilerUtil.new(class)
     return self
 end
 
-function CompilerUtil:Push(str)
-    assert(type(str) == "string", "Expected string, got " .. type(str))
-    return ("\tpush " .. str .. "\n")
+CompilerUtil.Eax = { Name = "Register", Value = "eax"}
+CompilerUtil.Ebx = { Name = "Register", Value = "ebx"}
+CompilerUtil.Ecx = { Name = "Register", Value = "ecx"}
+CompilerUtil.Edx = { Name = "Register", Value = "edx"}
+CompilerUtil.Esp = { Name = "Register", Value = "esp"}
+CompilerUtil.Ebp = { Name = "Register", Value = "ebp"}
+
+
+function CompilerUtil:Push(cur)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Push", Value = cur }
 end
 
-function CompilerUtil:Pop(str)
-    assert(type(str) == "string", "Expected string, got " .. type(str))
-    return ("\tpop " .. str .. "\n")
+function CompilerUtil:Pop(cur)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Pop", Value = cur }
 end
 
-function CompilerUtil:Jmp(str, str2)
-    assert(type(str) == "string", "Expected string, got " .. type(str) .. " and " .. type(str2))
-    return ("\t" .. (str2 or "jmp") .. " " .. str .. "\n")
+function CompilerUtil:Jmp(cur)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Jmp", Value = cur }
 end
 
-function CompilerUtil:Mov(str, str2)
-    assert(type(str) == "string" and type(str2) == "string", "Expected string, got " .. type(str) .. " and " .. type(str2))
-    return ("\tmov " .. str .. " , " .. str2 .. "\n")
+function CompilerUtil:Mov(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. tostring(cur))
+    return { Name = "Mov", Value = { cur, cur2 } }
 end
 
 function CompilerUtil:Label(str)
     assert(type(str) == "string", "Expected string, got " .. type(str))
-    return (str .. ":\n")
+    return { Name = "Text", Value = (str .. ":\n") }
 end
 
 function CompilerUtil:AdvLabel(str)
-    return self:Label(str) .. "\tpush ebp\n\tmov ebp, esp\n"
+    assert(type(str) == "string", "Expected string, got " .. type(str))
+    return { Name = "Text", Value = str .. ":\n\tpush ebp\n\tmov ebp, esp\n" }
 end
 
-function CompilerUtil:Add(str, str2)
-    return ("\tmov eax, %s\n\tmov ecx, %s\n\tadd eax, ecx\n"):format(str, str2)
+function CompilerUtil:Add(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Add", Value = { cur, cur2 } }
+end
+
+function CompilerUtil:Sub(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Sub", Value = { cur, cur2 } }
+end
+
+function CompilerUtil:Mul(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Multiply", Value = { cur, cur2 } }
+end
+
+function CompilerUtil:Div(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Divide", Value = { cur, cur2 } }
+end
+
+function CompilerUtil:Neg(cur)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Negate", Value = cur }
+end
+
+function CompilerUtil:Or(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Or", Value = { cur, cur2 } }
+end
+function CompilerUtil:And(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "And", Value = {cur, cur2}}
+end
+
+function CompilerUtil:Cmp(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Compare", Value = { cur, cur2 }}
+end
+
+function CompilerUtil:Equal(str)
+    assert(type(str) == "string", "Expected string, got " .. type(str))
+    return {
+        self:Mov(self.Edx, self:Text("1")),
+        self:Cmp(self.Ecx, self.Eax),
+        self:Text("\t" .. str .. " al\n"),
+        self:Text("\tmovzx eax, al\n")
+    }
+end
+
+function CompilerUtil:_param(str)
+    return { Name = "Param", Value = str }
+end
+
+function CompilerUtil:_local(str)
+    return { Name = "Local", Value = str }
 end
 
 function CompilerUtil:LocalVariable(str)
@@ -56,8 +118,14 @@ function CompilerUtil:LocalVariable(str)
     local pointer = env._ENV.Pointer
     env[str] = pointer
     env._ENV.Pointer = pointer + 4
-    return ("\tmov [ebp - %d], eax\n"):format(pointer)
+    env._ENV.NumVars = env._ENV.NumVars + 1
+    local name = "[ebp - " .. pointer .. "]"
+    return self:Mov(self:_local(name), self.Eax)
 end
 
+function CompilerUtil:Text(str)
+    assert(type(str) == "string", "Expected string, got " .. type(str))
+    return { Name = "Text", Value = str }
+end
 
 return CompilerUtil
