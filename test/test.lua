@@ -4,6 +4,8 @@
     09/10/2021
 --]]
 
+local Lua = require("src.service")
+
 local ToReturn, TableToString
 do
     local function ToString(v, indent)
@@ -75,25 +77,34 @@ function CheckDeep(tab1, tab2)
     return true
 end
 
-local function test(program, outlexed, outparsed)
+local function test(program, outlexed, outparsed, outcompiled)
     
-    return function (Lua)
-        local output, out = true, false
+    return function ()
         local lexed = Lua.Lex(program)
         if outlexed then
             local ret, newout = CheckDeep(outlexed, lexed)
-            output = output and ret
-            out = newout
+            if not ret then
+                error(newout, 2)
+            end
         end
         if outparsed then
             local parsed = Lua.Parse(lexed)
             -- We use parsed.Value since parsed is a chunk node.
             local ret, newout = CheckDeep(outparsed, parsed.Value)
-            output = output and ret
-            out = newout
+            if not ret then
+                error(newout, 2)
+            end
         end
-        
-        return output, out
+        if outcompiled then
+            local parsed = Lua.Parse(lexed)
+            local visited = Lua.Visit(parsed)
+            local compiled = Lua.Compile(visited)
+            
+            local ret, newout = CheckDeep(compiled, compiled)
+            if not ret then
+                error(newout, 2)
+            end
+        end
     end
 end
 
