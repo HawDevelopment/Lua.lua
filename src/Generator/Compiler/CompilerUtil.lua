@@ -20,26 +20,29 @@ end
 CompilerUtil.Eax = { Name = "Register", Value = "eax"}
 CompilerUtil.Ebx = { Name = "Register", Value = "ebx"}
 CompilerUtil.Ecx = { Name = "Register", Value = "ecx"}
-CompilerUtil.Edx = { Name = "Register", Value = "ecx"}
+CompilerUtil.Edx = { Name = "Register", Value = "edx"}
+CompilerUtil.Esp = { Name = "Register", Value = "esp"}
+CompilerUtil.Ebp = { Name = "Register", Value = "ebp"}
+
 
 function CompilerUtil:Push(cur)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Push", value = cur }
+    return { Name = "Push", Value = cur }
 end
 
 function CompilerUtil:Pop(cur)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Pop", value = cur }
+    return { Name = "Pop", Value = cur }
 end
 
 function CompilerUtil:Jmp(cur, cur2)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Jmp", value = { cur, cur2 } }
+    return { Name = "Jmp", Value = { cur, cur2 } }
 end
 
 function CompilerUtil:Mov(cur, cur2)
-    assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Mov", value = { cur, cur2 } }
+    assert(type(cur) == "table", "Expected table, got " .. tostring(cur))
+    return { Name = "Mov", Value = { cur, cur2 } }
 end
 
 function CompilerUtil:Label(str)
@@ -57,6 +60,11 @@ function CompilerUtil:Add(cur, cur2)
     return { Name = "Add", Value = { cur, cur2 } }
 end
 
+function CompilerUtil:Sub(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Sub", Value = { cur, cur2 } }
+end
+
 function CompilerUtil:Mul(cur, cur2)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
     return { Name = "Multiply", Value = { cur, cur2 } }
@@ -69,12 +77,35 @@ end
 
 function CompilerUtil:Neg(cur)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Negate", Value = cur}
+    return { Name = "Negate", Value = cur }
+end
+
+function CompilerUtil:Or(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "Or", Value = { cur, cur2 } }
+end
+function CompilerUtil:And(cur, cur2)
+    assert(type(cur) == "table", "Expected table, got " .. type(cur))
+    return { Name = "And", Value = {cur, cur2}}
 end
 
 function CompilerUtil:Cmp(cur, cur2)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Compate", Value = { cur, cur2 }}
+    return { Name = "Compare", Value = { cur, cur2 }}
+end
+
+function CompilerUtil:Equal(str)
+    assert(type(str) == "string", "Expected string, got " .. type(str))
+    return {
+        self:Mov(self.Edx, self:Text("1")),
+        self:Cmp(self.Ecx, self.Eax),
+        self:Text("\t" .. str .. " al\n"),
+        self:Text("\tmovzx eax, al\n")
+    }
+end
+
+function CompilerUtil:_param(str)
+    return { Name = "Param", Value = str }
 end
 
 function CompilerUtil:_local(str)
@@ -87,6 +118,7 @@ function CompilerUtil:LocalVariable(str)
     local pointer = env._ENV.Pointer
     env[str] = pointer
     env._ENV.Pointer = pointer + 4
+    env._ENV.NumVars = env._ENV.NumVars + 1
     local name = "[ebp - " .. pointer .. "]"
     return self:Mov(self:_local(name), self.Eax)
 end

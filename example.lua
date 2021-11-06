@@ -1,17 +1,11 @@
 
-function Fib(n)
-    local toret = 1
-    if n < 2 then
-        toret = n
+function Fib(m)
+    if m < 2 then
+        return m
     else
-        local a = Fib(n - 1)
-        local b = Fib(n - 2)
-        toret = a + b
+        return Fib(m - 1) + Fib(m - 2)
     end
-    return toret
 end
-
-local a = Fib(10)
-print(a)
+print(Fib(10))
 
 return
