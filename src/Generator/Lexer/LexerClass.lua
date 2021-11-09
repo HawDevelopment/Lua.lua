@@ -57,7 +57,7 @@ function LexerClass:LexString(char)
     --TODO: Implement escape characters
     --TODO: Implement multi line strings
     
-    local value = string.match(self.Source, char .. ".-" .. char, self.Pos.Counter)
+    local value = string.match(self.Source, char .. ".-" .. char, self.Head.Pos)
     if not value then
         error("Unterminated string literal")
     end
