@@ -23,6 +23,7 @@ function CompilerClass.new(visited, head, version)
     }
     
     self.Util = CompilerUtil.new(self)
+    self.Functions = CompilerFunctions.new(self, self.Util)
     
     self.GlobalEnv = { }
     self.GlobalDataEnv = { }
@@ -235,33 +236,44 @@ function CompilerClass:FunctionStatement(cur)
 end
 
 function CompilerClass:CallExpression(cur)
-    -- !THE VISITOR CREATES INSTRUCTIONS TO PUSH THE PARAMETERS!
-    
     local name = assert(cur.Value.name, "Attemted to call unknown function")
     
     -- Check if this could be a global
-    local func = CompilerFunctions(cur.Value.name)
-    if func then
-        -- We should not define it two times 
-        if not self.GlobalEnv[cur.Value.name] then
-            table.insert(self.File.Function, self.Util:Text(func[1]))
-            self.GlobalEnv[cur.Value.name] = cur.Value.name
-            self.GlobalDataEnv[cur.Value.name] = func[2] or {}
+    local func = self.Functions[cur.Value.name]
+    if func and not self.GlobalEnv[cur.Value.name] then
+        local body, args = func(self.Functions)
+        
+        table.insert(self.File.Function, body)
+        self.GlobalEnv[cur.Value.name] = cur.Value.name
+        
+        self.GlobalDataEnv[cur.Value.name] = args or {}
+        if args and args.varcost then
+            local env = self:GetEnv()
+            env._ENV.NumVars = env._ENV.NumVars + args.varcost
         end
     end
     
-    Log("Calling function: " .. name)
-    if not self.GlobalEnv[name] then
-        error("Attemp to call function '" .. tostring(name) .. "' (a nil value)")
-    end
+    assert(self.GlobalEnv[name], "Attemp to call function '" .. tostring(name) .. "' (a nil value)")
     local data = self.GlobalDataEnv[name]
     if data and data.numargs and data.numargs ~= cur.Value.argsnum then
         error("Function " .. name .. " expects " .. data.numargs .. " arguments, got " .. cur.Value.argsnum)
     end
-    return {
-        self.Util:Text(("\tcall %s ; Call function %s\n"):format(self.GlobalEnv[name], name)),
-        self.Util:Add(self.Util.Esp, self.Util:Text(tostring(cur.Value.argsnum * 4)))
-    }
+    
+    local body = { }
+    if data.startasm then
+        table.insert(body, data.startasm())
+    end
+    -- Do the args
+    for _, value in pairs(cur.Value.args) do
+        table.insert(body, self:Walk(value))
+    end
+    table.insert(body, self.Util:Text(("\tcall %s ; Call function %s\n"):format(self.GlobalEnv[name], name)))
+    table.insert(body, self.Util:Add(self.Util.Esp, self.Util:Text(tostring(cur.Value.argsnum * 4))))
+    
+    if data.endasm then
+        table.insert(body, data.endasm())
+    end
+    return body
 end
 
 -- If statement

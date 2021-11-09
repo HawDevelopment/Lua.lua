@@ -4,32 +4,64 @@
     11/09/2021
 --]]
 
-local Functions = {}
+--[[
+    Compiler util
+    HawDevelopment
+    30/10/2021
+--]]
 
-Functions["tostring"] = { [[
-tostring:
-    push ebp
-    mov ebp, esp
+
+local CompilerFunctions = {}
+CompilerFunctions.__index = CompilerFunctions
+
+function CompilerFunctions.new(class, util)
+    local self = setmetatable({}, CompilerFunctions)
     
-    pop ebp
-]], { NumArgs = 1 } }
+    self.Class = class
+    self.Util = util
+    
+    return self
+end
 
-Functions["print"] = { [[
-extern _printf
-print:
+local ToStringText = [[
+extern _sprintf
+tostring:
     push ebp
     mov ebp, esp
     mov eax, [ebp + 8]
     push eax
-    push print_number
-    call _printf
-    add esp, 8
+    push tostring_format
+    mov eax, [ebp + 12]
+    push eax
+    call _sprintf
+    add esp, 12
     pop ebp
     ret
-]], { NumArgs = 1 }}
-Functions["puts"] = { [[
+]]
+
+function CompilerFunctions:tostring()
+    return self.Util:Text(ToStringText), {
+        numargs = 1,
+        startasm = function ()
+            return {
+                self.Util:Text("\tsub esp, 260\n"),
+                self.Util:Mov(self.Util.Eax, self.Util.Esp),
+                self.Util:Mov(self.Util:Text("[esp + 256]"), self.Util.Eax),
+                self.Util:Push(self.Util.Eax),
+            }
+        end,
+        endasm = function ()
+            local env = self.Class:GetEnv()
+            return {
+                self.Util:Pop(self.Util.Eax),
+            }
+        end,
+    }
+end
+
+local PrintText = [[
 extern _puts
-puts:
+print:
     push ebp
     mov ebp, esp
     mov eax, [ebp + 8]
@@ -38,8 +70,12 @@ puts:
     add esp, 4
     pop ebp
     ret
-]], { NumArgs = 1 }}
+]]
 
-return function (name)
-    return Functions[name]
+function CompilerFunctions:print()
+    return self.Util:Text(PrintText), {
+        numargs = 1
+    }
 end
+
+return CompilerFunctions

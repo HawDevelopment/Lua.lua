@@ -73,18 +73,19 @@ function VisitorClass:FunctionStatement(cur, toadd)
 end
 
 function VisitorClass:CallExpression(cur, toadd)
+    local arg = {}
     if #cur.Value.args > 1 then
         for i = #cur.Value.args, 1, -1 do
-            self:Walk(cur.Value.args[i], toadd)
-            self:_instruction(toadd, self.Util:Push(self.Util.Eax))
+            self:Walk(cur.Value.args[i], arg)
+            self:_instruction(arg, self.Util:Push(self.Util.Eax))
         end
     elseif #cur.Value.args == 1 then
-        self:Walk(cur.Value.args[1], toadd)
-        self:_instruction(toadd, self.Util:Push(self.Util.Eax))
+        self:Walk(cur.Value.args[1], arg)
+        self:_instruction(arg, self.Util:Push(self.Util.Eax))
     end
     
     
-    cur.Value = { name = cur.Value.base.Value, args = cur.Value.args, islocal = cur.Value.islocal, argsnum = #cur.Value.args }
+    cur.Value = { name = cur.Value.base.Value, args = arg, islocal = cur.Value.islocal, argsnum = #cur.Value.args }
     table.insert(toadd, cur)
 end
 

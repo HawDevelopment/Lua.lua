@@ -7,7 +7,7 @@
 local TableHead = require("src.Generator.Util.TableHead")
 
 local StartAssembly = "section .text\nglobal _main\n\n_main:\n\tpush ebp\n\tmov ebp, esp\n"
-local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0 ; Used for print\n"
+local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0\ntostring_format db '%d', 0\n"
 
 local RenderClass = {}
 RenderClass.__index = RenderClass
