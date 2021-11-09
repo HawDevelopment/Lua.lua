@@ -128,4 +128,8 @@ function CompilerUtil:Text(str)
     return { Name = "Text", Value = str }
 end
 
+function CompilerUtil:DefineByte(...)
+    return { Name = "DefineByte", Value = { ... } }
+end
+
 return CompilerUtil

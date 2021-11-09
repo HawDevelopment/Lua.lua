@@ -33,6 +33,11 @@ function VisitorClass:Boolean(cur, toadd)
     self:_instruction(toadd, self.Util:Mov(self.Util.Eax, self.Util:Text(cur.Value == "true" and "1" or "0")))
 end
 
+function VisitorClass:String(cur, toadd)
+    self:_instruction(toadd, self.Util:Mov(self.Util.Ebx, self.Util:Text(tostring(#cur.Value))))
+    table.insert(toadd, cur)
+end
+
 function VisitorClass:UnaryExpression(cur, toadd)
     self:Walk(cur.Value.expr, toadd)
     table.insert(toadd, cur)
@@ -161,6 +166,7 @@ local NameToFunction = {
     IntegerLiteral = VisitorClass.Number,
     FloatLiteral = VisitorClass.Number,
     BooleanLiteral = VisitorClass.Boolean,
+    StringLiteral = VisitorClass.String,
     
     UnaryExpression = VisitorClass.UnaryExpression,
     ReturnStatement = VisitorClass.ReturnStatement,

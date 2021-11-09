@@ -1,8 +1,8 @@
 
-local b = 0
-for i = 0, 100, 1 do
-    b = b + 1
-end
-print(b)
+puts("Input:")
+print(10)
+print(5)
+puts("Output:")
+print(5 + 10)
 
 return

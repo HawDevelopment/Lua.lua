@@ -61,7 +61,7 @@ function LexerClass:LexString(char)
     if not value then
         error("Unterminated string literal")
     end
-    self.Tokens[#self.Tokens + 1] = { Name = "String",
+    self.Tokens[#self.Tokens + 1] = { Name = "StringLiteral",
         Value = value,
         Type = "String",
         Position = self.Head:CopyPos()
