@@ -29,4 +29,17 @@ return {
             }
         )
     }),
+    
+    test("function Hello() return end", nil, {
+        {
+            Name = "FunctionStatement",
+            Type = "Statement",
+            Value = {
+                body = { { Name = "ReturnStatement", Value = {} } },
+                islocal = false,
+                name = { Name = "Hello", Value = "Hello", Type = "Identifier" },
+                params = {},
+            }
+        }
+    })
 }

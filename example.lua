@@ -1,10 +1,8 @@
 
-function Fib(n)
-    print(n)
-    return 1
+local b = 0
+for i = 0, 100, 1 do
+    b = b + 1
 end
-
-local a = Fib(1)
-print(a)
+print(b)
 
 return

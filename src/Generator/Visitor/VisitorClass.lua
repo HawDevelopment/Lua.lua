@@ -5,6 +5,7 @@
 --]]
 
 local TableHead = require("src.Generator.Util.TableHead")
+local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
 
 local VisitorClass = {}
 VisitorClass.__index = VisitorClass
@@ -15,24 +16,21 @@ function VisitorClass.new(ast, head)
     self.Ast = ast
     self.Out = {}
     self.Head = head or TableHead.new(ast.Value)
+    self.Util = CompilerUtil.new(nil) -- We cant pass compilers
     
     return self
 end
 
-function VisitorClass:_instruction(toadd, name, ...)
-    local value
-    if ... then
-        value = { ... }
-    end
-    table.insert(toadd, { Name = name, Value = value , Type = "Instruction" })
+function VisitorClass:_instruction(toadd, value)
+    table.insert(toadd, { Name ="Instruction", Value = value })
 end
 
 function VisitorClass:Number(cur, toadd)
-    self:_instruction(toadd, "Mov", "eax", cur.Value)
+    self:_instruction(toadd, self.Util:Mov(self.Util.Eax, self.Util:Text(tostring(cur.Value))))
 end
 
 function VisitorClass:Boolean(cur, toadd)
-    self:_instruction(toadd, "Mov", "eax", cur.Value == "true" and "1" or "0")
+    self:_instruction(toadd, self.Util:Mov(self.Util.Eax, self.Util:Text(cur.Value == "true" and "1" or "0")))
 end
 
 function VisitorClass:UnaryExpression(cur, toadd)
@@ -42,15 +40,15 @@ end
 
 function VisitorClass:BinaryExpression(cur, toadd)
     self:Walk(cur.Value.left, toadd)
-    self:_instruction(toadd, "Push", "eax")
+    self:_instruction(toadd, self.Util:Push(self.Util.Eax))
     self:Walk(cur.Value.right, toadd)
+    self:_instruction(toadd, self.Util:Pop(self.Util.Ecx))
     
     cur.Value = cur.Value.op.Value -- Get the string of the operator
     table.insert(toadd, cur)
 end
 
 function VisitorClass:ReturnStatement(cur, toadd)
-    
     for _, value in pairs(cur.Value) do
         self:Walk(value, toadd)
     end
@@ -73,11 +71,11 @@ function VisitorClass:CallExpression(cur, toadd)
     if #cur.Value.args > 1 then
         for i = #cur.Value.args, 1, -1 do
             self:Walk(cur.Value.args[i], toadd)
-            self:_instruction(toadd, "Push", "eax")
+            self:_instruction(toadd, self.Util:Push(self.Util.Eax))
         end
     elseif #cur.Value.args == 1 then
         self:Walk(cur.Value.args[1], toadd)
-        self:_instruction(toadd, "Push", "eax")
+        self:_instruction(toadd, self.Util:Push(self.Util.Eax))
     end
     
     
@@ -91,10 +89,10 @@ end
 
 -- TODO: Add suport for multiple inits
 function VisitorClass:LocalStatement(cur, toadd)
-    if #cur.Value.inits > 0 then
+    if cur.Value.inits and #cur.Value.inits > 0 then
         self:Walk(cur.Value.inits[1], toadd)
     else
-        self:_instruction(toadd, "Mov", "eax", 0) -- If there is no init, set it to 0
+        self:_instruction(toadd, self.Util:Mov(self.Util.Eax, self.Util:Text("0"))) -- If there is no init, set it to 0
     end
     cur.Value = cur.Value.idens[1] -- Get the name of the variable
     table.insert(toadd, cur)

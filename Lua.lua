@@ -23,7 +23,7 @@ local PrintTokens
 do
     local TableToString, ToReturn
     local function ToString(v, indent)
-        if type(v) == "table" and v.Name and v.Type then
+        if type(v) == "table" and v.Name then
             return ToReturn(v, indent)
         elseif type(v) == "table" then
             return TableToString(v, indent)
@@ -46,8 +46,18 @@ do
     end
 
     ToReturn = function(self, indent)
+        if not self.Name and not self.Value then
+            return TableToString(self, indent)
+        end
+
+        local value = (self.Value or "nil")
+        if type(value) == "string" then
+            value = string.gsub(value, "\n", "\\n")
+            value = string.gsub(value, "\t", "\\t")
+        end
+
         return "(" .. (self.Name or "nil") .. ":"
-            .. (type(self.Value) == "table" and TableToString(self.Value or {}, indent) or (self.Value or "nil"))
+            .. (type(self.Value) == "table" and TableToString(self.Value or {}, indent) or value)
             .. ")"
     end
 
@@ -141,13 +151,13 @@ local function Run(lexed, parsed, visited, settings)
         PrintTokens(visited)
     end
     if settings.Compile then
-        local out = Lua.Compile(Copy(visited))
+        local compiled = Lua.Compile(Copy(visited))
         if settings.Output then
+            local rendered = Lua.Render(compiled)
             local file = io.open(settings.Output .. ".asm", "w")
-            file:write(out)
+            file:write(rendered)
             file:close()
             if AUTO_COMPILE then
-                
                 os.execute("nasm -f win32 " .. settings.Output .. ".asm")
                 os.execute("gcc -m32 -o " .. settings.Output .. " " .. settings.Output .. ".obj")
                 if AUTO_RUN then
@@ -155,7 +165,13 @@ local function Run(lexed, parsed, visited, settings)
                 end
             end
         else
-            print(out)
+            print("Compiled: ")
+            print("Start: ")
+            PrintTokens(compiled.Start)
+            print("Function: ")
+            PrintTokens(compiled.Function)
+            print("End: ")
+            PrintTokens(compiled.End)
         end
     end
 end
@@ -171,6 +187,7 @@ function RunCommand()
         PrintVisited = ValueInTable(arg, "--visit"),
         Debug = ValueInTable(arg, "--debug") or ValueInTable(arg, "-d"),
         Print = ValueInTable(arg, "--print") or ValueInTable(arg, "-p"),
+        PrintCompile = ValueInTable(arg, "--print-compile") or ValueInTable(arg, "-pc"),
         Compile = ValueInTable(arg, "--com") or ValueInTable(arg, "-c"),
     }
     -- Output

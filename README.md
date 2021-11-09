@@ -3,11 +3,12 @@
 Lua interpreter made in Lua.
 
 Current progress:
-- ✔ Lexer
-- ✔ Parser
-- ❌ Full code covrage
-- ⚒ Compiler
-- ❌ Interpreter
+
+-   ✔ Lexer
+-   ✔ Parser
+-   ❌ Full test covrage
+-   ⚒ Compiler
+-   ❌ Interpreter
 
 # Usage
 
@@ -51,16 +52,8 @@ Run builder:
     vendor/luamake/luamake.exe rebuild
     ```
 
--   Linux:
+-   Linux And Mac:
 
-    ```bash
-    cd vendor/luamake
-    ./compile/install.sh
-    cd ../..
-    vendor/luamake/luamake rebuild
-    ```
-
--   Mac:
     ```bash
     cd vendor/luamake
     ./compile/install.sh
@@ -85,4 +78,12 @@ If you make any changes to the Lexer, Parser or Interpreter, please add the outp
 
 ```bash
 $ node perf.js
+```
+
+### Tests:
+
+Command for running tests (you need to add git submodules):
+
+```bash
+lua vendor/lunar/Lunar.lua --directory test ./test/tests/
 ```
