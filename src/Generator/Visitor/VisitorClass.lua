@@ -84,7 +84,6 @@ function VisitorClass:CallExpression(cur, toadd)
         self:_instruction(arg, self.Util:Push(self.Util.Eax))
     end
     
-    
     cur.Value = { name = cur.Value.base.Value, args = arg, islocal = cur.Value.islocal, argsnum = #cur.Value.args }
     table.insert(toadd, cur)
 end

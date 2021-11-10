@@ -1,5 +1,4 @@
 
-local a = 10
-print(tostring(a))
+print(concat("Hello world", "Hello"))
 
 return

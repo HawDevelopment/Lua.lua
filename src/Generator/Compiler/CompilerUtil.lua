@@ -8,7 +8,6 @@
 local CompilerUtil = {}
 CompilerUtil.__index = CompilerUtil
 
-
 function CompilerUtil.new(class)
     local self = setmetatable({}, CompilerUtil)
     

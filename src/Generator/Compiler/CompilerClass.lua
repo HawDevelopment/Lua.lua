@@ -4,7 +4,7 @@
     21/10/2021
 --]]
 
-local LOG = false
+local LOG =  false
 
 local TableHead = require("src.Generator.Util.TableHead")
 local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
@@ -124,7 +124,8 @@ do
             [">"] = "setg", [">="] = "setge",
             ["<"] = "setl", ["<="] = "setle",
             ["or"] = self.Util:Or(self.Util.Eax, self.Util.Ecx),
-            ["and"] = self.Util:And(self.Util.Eax, self.Util.Ecx)
+            ["and"] = self.Util:And(self.Util.Eax, self.Util.Ecx),
+            [".."] = true, -- Implemented in if
         }
     end
 
@@ -134,7 +135,17 @@ do
         assert(self._optorender[op], "The operator: " .. op .. " is not a valid operator!")
 
         local toret
-        if self.Version.LOGICAL_OPERATORS[op] then
+        if op == ".." then
+            self:_import("concat")
+            toret = {
+                self.Util:Push(self.Util.Ecx),
+                self:Walk({
+                    Name = "CallExpression",
+                    Value = { name = "concat", args = { }, argsnum = 0 }
+                })
+            }
+            
+        elseif self.Version.LOGICAL_OPERATORS[op] then
             -- and, or
             toret = self._optorender[op]
         elseif self.Version.EQUALITY_OPERATORS[op] or self.Version.COMPARISON_OPERATORS[op] then
@@ -142,7 +153,6 @@ do
             toret = self.Util:Equal(self._optorender[op])
         else
             -- Binary
-            
             toret = self._optorender[op]
         end
         return toret
@@ -235,23 +245,28 @@ function CompilerClass:FunctionStatement(cur)
     return self.Util:Text("\t; Created function " .. cur.Value.name .. " \n")
 end
 
-function CompilerClass:CallExpression(cur)
-    local name = assert(cur.Value.name, "Attemted to call unknown function")
-    
-    -- Check if this could be a global
-    local func = self.Functions[cur.Value.name]
-    if func and not self.GlobalEnv[cur.Value.name] then
+function CompilerClass:_import(name)
+    local func = self.Functions[name]
+    if func and not self.GlobalEnv[name] then
+        Log("Importing function: " .. name)
         local body, args = func(self.Functions)
         
         table.insert(self.File.Function, body)
-        self.GlobalEnv[cur.Value.name] = cur.Value.name
+        self.GlobalEnv[name] = name
         
-        self.GlobalDataEnv[cur.Value.name] = args or {}
+        self.GlobalDataEnv[name] = args or {}
         if args and args.varcost then
             local env = self:GetEnv()
             env._ENV.NumVars = env._ENV.NumVars + args.varcost
         end
     end
+end
+
+function CompilerClass:CallExpression(cur)
+    local name = assert(cur.Value.name, "Attemted to call unknown function")
+    
+    -- Check if this could be a global
+    self:_import(name)
     
     assert(self.GlobalEnv[name], "Attemp to call function '" .. tostring(name) .. "' (a nil value)")
     local data = self.GlobalDataEnv[name]
@@ -259,6 +274,7 @@ function CompilerClass:CallExpression(cur)
         error("Function " .. name .. " expects " .. data.numargs .. " arguments, got " .. cur.Value.argsnum)
     end
     
+    Log("Calling function: " .. name)
     local body = { }
     if data.startasm then
         table.insert(body, data.startasm())
