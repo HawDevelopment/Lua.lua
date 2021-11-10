@@ -138,10 +138,12 @@ do
         if op == ".." then
             self:_import("concat")
             toret = {
-                self.Util:Push(self.Util.Ecx),
+                self.Util:Mov(self.Util.Ebx, self.Util.Eax),
                 self:Walk({
                     Name = "CallExpression",
-                    Value = { name = "concat", args = { }, argsnum = 0 }
+                    Value = { name = "concat", args = {
+                        { Name = "Instruction", Value = { self.Util:Push(self.Util.Ebx), self.Util:Push(self.Util.Ecx) } }
+                    }, argsnum = 2 }
                 })
             }
             

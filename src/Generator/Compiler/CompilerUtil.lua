@@ -122,6 +122,46 @@ function CompilerUtil:LocalVariable(str)
     return self:Mov(self:_local(name), self.Eax)
 end
 
+local Limiters = {
+    ["ReturnStatement"] = 1;
+    ["CallExpression"] = 2;
+}
+
+function CompilerUtil:LimitBuffer(size)
+    assert(type(size) == "number", "Expected number, got " .. type(size))
+    
+    -- Since its limited we want to free it up
+    local index, cur = self.Class.Head.Pos, nil
+    repeat
+        index = index + 1
+        cur = self.Class.Head.Table[index]
+        if index > #self.Class.Head.Table then
+            cur = nil
+            break
+        end
+    until Limiters[cur.Name]
+    if cur then
+        local limit, pos = Limiters[cur.Name], index + 1
+        if limit == 1 then
+            pos = index
+        end
+        table.insert(self.Class.Head.Table, pos, {
+            Name = "Instruction",
+            Value = {
+                self:Text("\tadd esp, " .. size .. "\n"),
+            }
+        })
+    end
+    
+    
+    return {
+        self:Text("\tsub esp, " .. size .. "\n"),
+        self:Mov(self.Eax, self.Esp),
+        self:Mov(self:Text("[esp + " .. size -  4 .. "]"), self.Eax),
+        self:LocalVariable("__buffer")
+    }
+end
+
 function CompilerUtil:Text(str)
     assert(type(str) == "string", "Expected string, got " .. type(str))
     return { Name = "Text", Value = str }

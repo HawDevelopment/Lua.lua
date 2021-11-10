@@ -92,18 +92,24 @@ function CompilerFunctions:concat()
     return self.Util:Text(ConcatText), {
         numargs = 2,
         startasm = function ()
-            return {
-                self.Util:Text("\tsub esp, 260\n"),
-                self.Util:Mov(self.Util.Eax, self.Util.Esp),
-                self.Util:Mov(self.Util:Text("[esp + 256]"), self.Util.Eax),
-                self.Util:Push(self.Util.Eax),
-            }
+            local body = {}
+            local env = self.Class:GetEnv()
+            if not env["__buffer"] then
+                -- Create a buffer
+                table.insert(body, self.Util:LimitBuffer(260))
+            else
+                table.insert(body, {
+                    self.Class:Walk({ Name = "GetLocalExpression", Value = "__buffer", Type = "Expression" }),
+                })
+            end
+            table.insert(body, self.Util:Push(self.Util.Eax))
+            return body
         end,
         endasm = function ()
             local env = self.Class:GetEnv()
             return {
-                self.Util:Pop(self.Util.Eax),
-                self.Util:Add(self.Util.Esp, self.Util:Text("256"))
+                self.Util:Add(self.Util.Esp, self.Util:Text("4")),
+                self.Class:Walk({ Name = "GetLocalExpression", Value = "__buffer", Type = "Expression" }),
             }
         end,
     }
