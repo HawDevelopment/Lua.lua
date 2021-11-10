@@ -37,10 +37,10 @@ function CompilerFunctions:tostring()
         numargs = 1,
         startasm = function ()
             return {
-                self.Util:Text("\tsub esp, 260\n"),
-                self.Util:Mov(self.Util.Eax, self.Util.Esp),
-                self.Util:Mov(self.Util:Text("[esp + 256]"), self.Util.Eax),
-                self.Util:Push(self.Util.Eax),
+                -- self.Util:Text("\tsub esp, 260\n"),
+                -- self.Util:Mov(self.Util.Eax, self.Util.Esp),
+                -- self.Util:Mov(self.Util:Text("[esp + 256]"), self.Util.Eax),
+                -- self.Util:Push(self.Util.Eax),
             }
         end,
         endasm = function ()
@@ -103,6 +103,7 @@ function CompilerFunctions:concat()
             local env = self.Class:GetEnv()
             return {
                 self.Util:Pop(self.Util.Eax),
+                self.Util:Add(self.Util.Esp, self.Util:Text("256"))
             }
         end,
     }
