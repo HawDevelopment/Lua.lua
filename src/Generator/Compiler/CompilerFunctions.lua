@@ -18,13 +18,14 @@ end
 
 local ToStringText = [[
 extern _sprintf
-tostring:
+sprintf:
     push ebp
     mov ebp, esp
-    mov eax, [ebp + 8]
+    mov eax, [ebp + 16]
     push eax
-    push tostring_format
     mov eax, [ebp + 12]
+    push eax
+    mov eax, [ebp + 8]
     push eax
     call _sprintf
     add esp, 12
@@ -32,23 +33,9 @@ tostring:
     ret
 ]]
 
-function CompilerFunctions:tostring()
+function CompilerFunctions:sprintf()
     return self.Util:Text(ToStringText), {
-        numargs = 1,
-        startasm = function ()
-            return {
-                -- self.Util:Text("\tsub esp, 260\n"),
-                -- self.Util:Mov(self.Util.Eax, self.Util.Esp),
-                -- self.Util:Mov(self.Util:Text("[esp + 256]"), self.Util.Eax),
-                -- self.Util:Push(self.Util.Eax),
-            }
-        end,
-        endasm = function ()
-            local env = self.Class:GetEnv()
-            return {
-                self.Util:Pop(self.Util.Eax),
-            }
-        end,
+        numargs = 3,
     }
 end
 
@@ -71,47 +58,63 @@ function CompilerFunctions:print()
     }
 end
 
-local ConcatText = [[
-extern _sprintf
-concat:
+local BufferText = [[
+buffer:
+    pop ecx
+    add esp, 256
+    mov eax, esp
+    mov [esp - 256], eax
+    push ecx
+    ret
+]]
+
+function CompilerFunctions:buffer()
+    return self.Util:Text(BufferText), {
+        numargs = 0,
+        startasm = function ()
+            return self.Util:Text("\t; Created buffer\n")
+        end,
+    }
+end
+
+local StrCpyText = [[
+extern _strcpy
+strcpy:
     push ebp
     mov ebp, esp
     mov eax, [ebp + 12]
     push eax
     mov eax, [ebp + 8]
     push eax
-    push concat_format
-    mov eax, [ebp + 16]
-    push eax
-    call _sprintf
-    add esp, 16
+    call _strcpy
+    add esp, 8
     pop ebp
     ret
 ]]
-function CompilerFunctions:concat()
-    return self.Util:Text(ConcatText), {
+
+function CompilerFunctions:strcpy()
+    return self.Util:Text(StrCpyText), {
         numargs = 2,
-        startasm = function ()
-            local body = {}
-            local env = self.Class:GetEnv()
-            if not env["__buffer"] then
-                -- Create a buffer
-                table.insert(body, self.Util:LimitBuffer(260))
-            else
-                table.insert(body, {
-                    self.Class:Walk({ Name = "GetLocalExpression", Value = "__buffer", Type = "Expression" }),
-                })
-            end
-            table.insert(body, self.Util:Push(self.Util.Eax))
-            return body
-        end,
-        endasm = function ()
-            local env = self.Class:GetEnv()
-            return {
-                self.Util:Add(self.Util.Esp, self.Util:Text("4")),
-                self.Class:Walk({ Name = "GetLocalExpression", Value = "__buffer", Type = "Expression" }),
-            }
-        end,
+    }
+end
+
+local StrCatText = [[
+extern _strcat
+strcat:
+    push ebp
+    mov ebp, esp
+    mov eax, [ebp + 12]
+    push eax
+    mov eax, [ebp + 8]
+    push eax
+    call _strcat
+    add esp, 8
+    pop ebp
+    ret
+]]
+function CompilerFunctions:strcat()
+    return self.Util:Text(StrCatText), {
+        numargs = 2,
     }
 end
 

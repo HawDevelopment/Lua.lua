@@ -1,6 +1,4 @@
 
-local a = "Hello world"
-local b = "Hello world" .. a
-print(b)
+print(strcat(strcat("Hello ", "world"), "!"))
 
 return
