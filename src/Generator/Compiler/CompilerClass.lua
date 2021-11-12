@@ -4,7 +4,7 @@
     21/10/2021
 --]]
 
-local LOG =  false
+local LOG = false
 
 local TableHead = require("src.Generator.Util.TableHead")
 local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
@@ -52,9 +52,6 @@ end
 -- Util
 
 do
-    function CompilerClass:Add(pos, toadd)
-        self.File[pos] = toadd
-    end
     function CompilerClass:CreateEnv()
         self.TopEnvoriment = self.TopEnvoriment + 1
         self.Envoriments[self.TopEnvoriment] = { _ENV = { Pointer = 4, NumVars = 0 } }
@@ -243,7 +240,7 @@ function CompilerClass:FunctionStatement(cur)
         self.GlobalEnv[cur.Value.name] = hash
     end
     
-    self:Add("Function", body)
+    table.insert(self.File.Function, body)
     return self.Util:Text("\t; Created function " .. cur.Value.name .. " \n")
 end
 
@@ -252,15 +249,9 @@ function CompilerClass:_import(name)
     if func and not self.GlobalEnv[name] then
         Log("Importing function: " .. name)
         local body, args = func(self.Functions)
-        
         table.insert(self.File.Function, body)
         self.GlobalEnv[name] = name
-        
         self.GlobalDataEnv[name] = args or {}
-        if args and args.varcost then
-            local env = self:GetEnv()
-            env._ENV.NumVars = env._ENV.NumVars + args.varcost
-        end
     end
 end
 
