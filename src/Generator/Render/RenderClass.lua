@@ -6,9 +6,8 @@
 
 local TableHead = require("src.Generator.Util.TableHead")
 
-local PrintAssembly = "print:\n\tpush ebp\n\tmov ebp, esp\n\tmov eax, [ebp + 8]\n\tpush eax\n\tpush print_number\n\tcall _printf\n\tadd esp, 8\n\tpop ebp\n\tret\n"
-local StartAssembly = "section .text\nglobal _main\nextern _printf\n" .. PrintAssembly .. "\n_main:\n\tpush ebp\n\tmov ebp, esp\n"
-local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0 ; Used for print"
+local StartAssembly = "section .text\nglobal _main\n\n_main:\n\tpush ebp\n\tmov ebp, esp\n"
+local EndAssembly = "section .data\nprint_number db '%i', 0xA, 0\ntostring_format db '%d', 0\nconcat_format db '%s%s', 0\n"
 
 local RenderClass = {}
 RenderClass.__index = RenderClass
@@ -140,6 +139,16 @@ function RenderClass:And(cur, isstrict)
     local stop = ("_and%s:\n\tmov eax, 0\n\n_end%s:\n")
         :format(hash, hash)
     return start .. stop
+end
+
+function RenderClass:DefineByte(cur, isstrict)
+    self:_strict(isstrict, true)
+    local todb = assert(cur.Value[1], "Expected a db name")
+    local str = ""
+    for i = 2, #cur.Value do
+        str = str .. cur.Value[i] .. (i == #cur.Value and "" or ", ")
+    end
+    return todb .. " db " .. str .. "\n"
 end
 
 

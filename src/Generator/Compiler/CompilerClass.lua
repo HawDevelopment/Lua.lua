@@ -4,10 +4,11 @@
     21/10/2021
 --]]
 
-local LOG = false
+local LOG =  false
 
 local TableHead = require("src.Generator.Util.TableHead")
 local CompilerUtil = require("src.Generator.Compiler.CompilerUtil")
+local CompilerFunctions = require("src.Generator.Compiler.CompilerFunctions")
 
 local CompilerClass = {}
 CompilerClass.__index = CompilerClass
@@ -22,9 +23,11 @@ function CompilerClass.new(visited, head, version)
     }
     
     self.Util = CompilerUtil.new(self)
+    self.Functions = CompilerFunctions.new(self, self.Util)
     
-    self.GlobalEnv = { ["print"] = "print" }
-    self.GlobalDataEnv = { ["print"] = { numargs = 1}}
+    self.GlobalEnv = { }
+    self.GlobalDataEnv = { }
+    self.GlobalString = { }
     
     self.Envoriments = {}
     self.TopEnvoriment = 0
@@ -65,6 +68,27 @@ do
     end
 end
 
+function CompilerClass:StringLiteral(cur)
+    local name
+    if self.GlobalString[cur.Value] then
+        -- Theres already a string with same value
+        Log("Found string: " .. cur.Value)
+        name = self.GlobalString[cur.Value]
+    else
+        Log("Creating string: " .. cur.Value)
+        name = GetHash(cur)
+        table.insert(self.File.End, self.Util:DefineByte(
+            "str_" .. name,
+            -- When we define the string we remove the start and end symbols
+            ("\'%s\'"):format(cur.Value:sub(2, -2)),
+            "0"
+        ))
+        self.GlobalString[cur.Value] = name
+    end
+    name = "str_" .. name
+    return self.Util:Mov(self.Util.Eax, self.Util:Text(name))
+end
+
 function CompilerClass:ReturnStatement(_)
     local env = self:GetEnv()
     return self.Util:Text("\tadd esp, " .. env._ENV.NumVars * 4 .. "\n\tpop ebp\n\tret\n")
@@ -100,7 +124,8 @@ do
             [">"] = "setg", [">="] = "setge",
             ["<"] = "setl", ["<="] = "setle",
             ["or"] = self.Util:Or(self.Util.Eax, self.Util.Ecx),
-            ["and"] = self.Util:And(self.Util.Eax, self.Util.Ecx)
+            ["and"] = self.Util:And(self.Util.Eax, self.Util.Ecx),
+            [".."] = true, -- Implemented in if
         }
     end
 
@@ -110,7 +135,19 @@ do
         assert(self._optorender[op], "The operator: " .. op .. " is not a valid operator!")
 
         local toret
-        if self.Version.LOGICAL_OPERATORS[op] then
+        if op == ".." then
+            self:_import("concat")
+            toret = {
+                self.Util:Mov(self.Util.Ebx, self.Util.Eax),
+                self:Walk({
+                    Name = "CallExpression",
+                    Value = { name = "concat", args = {
+                        { Name = "Instruction", Value = { self.Util:Push(self.Util.Ebx), self.Util:Push(self.Util.Ecx) } }
+                    }, argsnum = 2 }
+                })
+            }
+            
+        elseif self.Version.LOGICAL_OPERATORS[op] then
             -- and, or
             toret = self._optorender[op]
         elseif self.Version.EQUALITY_OPERATORS[op] or self.Version.COMPARISON_OPERATORS[op] then
@@ -118,7 +155,6 @@ do
             toret = self.Util:Equal(self._optorender[op])
         else
             -- Binary
-            
             toret = self._optorender[op]
         end
         return toret
@@ -146,7 +182,6 @@ function CompilerClass:AssignmentStatement(cur)
     end
     return self.Util:Mov(self.Util:_local("[ebp - " .. env[cur.Value.Value] .. "]"), self.Util.Eax)
 end
-
 
 function CompilerClass:FunctionStatement(cur)
     Log("Creating function: " .. cur.Value.name)
@@ -212,22 +247,51 @@ function CompilerClass:FunctionStatement(cur)
     return self.Util:Text("\t; Created function " .. cur.Value.name .. " \n")
 end
 
-function CompilerClass:CallExpression(cur)
-    -- !THE VISITOR CREATES INSTRUCTIONS TO PUSH THE PARAMETERS!
-    
-    local name = assert(cur.Value.name, "Attemted to call unknown function")
-    Log("Calling function: " .. name)
-    if not self.GlobalEnv[name] then
-        error("Attemp to call function '" .. tostring(name) .. "' (a nil value)")
+function CompilerClass:_import(name)
+    local func = self.Functions[name]
+    if func and not self.GlobalEnv[name] then
+        Log("Importing function: " .. name)
+        local body, args = func(self.Functions)
+        
+        table.insert(self.File.Function, body)
+        self.GlobalEnv[name] = name
+        
+        self.GlobalDataEnv[name] = args or {}
+        if args and args.varcost then
+            local env = self:GetEnv()
+            env._ENV.NumVars = env._ENV.NumVars + args.varcost
+        end
     end
+end
+
+function CompilerClass:CallExpression(cur)
+    local name = assert(cur.Value.name, "Attemted to call unknown function")
+    
+    -- Check if this could be a global
+    self:_import(name)
+    
+    assert(self.GlobalEnv[name], "Attemp to call function '" .. tostring(name) .. "' (a nil value)")
     local data = self.GlobalDataEnv[name]
     if data and data.numargs and data.numargs ~= cur.Value.argsnum then
         error("Function " .. name .. " expects " .. data.numargs .. " arguments, got " .. cur.Value.argsnum)
     end
-    return {
-        self.Util:Text(("\tcall %s ; Call function %s\n"):format(self.GlobalEnv[name], name)),
-        self.Util:Add(self.Util.Esp, self.Util:Text(tostring(cur.Value.argsnum * 4)))
-    }
+    
+    Log("Calling function: " .. name)
+    local body = { }
+    if data.startasm then
+        table.insert(body, data.startasm())
+    end
+    -- Do the args
+    for _, value in pairs(cur.Value.args) do
+        table.insert(body, self:Walk(value))
+    end
+    table.insert(body, self.Util:Text(("\tcall %s ; Call function %s\n"):format(self.GlobalEnv[name], name)))
+    table.insert(body, self.Util:Add(self.Util.Esp, self.Util:Text(tostring(cur.Value.argsnum * 4))))
+    
+    if data.endasm then
+        table.insert(body, data.endasm())
+    end
+    return body
 end
 
 -- If statement
@@ -402,6 +466,5 @@ function CompilerClass:Run()
     
     return self.File
 end
-
 
 return CompilerClass

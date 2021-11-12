@@ -33,6 +33,11 @@ function VisitorClass:Boolean(cur, toadd)
     self:_instruction(toadd, self.Util:Mov(self.Util.Eax, self.Util:Text(cur.Value == "true" and "1" or "0")))
 end
 
+function VisitorClass:String(cur, toadd)
+    self:_instruction(toadd, self.Util:Mov(self.Util.Ebx, self.Util:Text(tostring(#cur.Value))))
+    table.insert(toadd, cur)
+end
+
 function VisitorClass:UnaryExpression(cur, toadd)
     self:Walk(cur.Value.expr, toadd)
     table.insert(toadd, cur)
@@ -68,18 +73,18 @@ function VisitorClass:FunctionStatement(cur, toadd)
 end
 
 function VisitorClass:CallExpression(cur, toadd)
+    local arg = {}
     if #cur.Value.args > 1 then
         for i = #cur.Value.args, 1, -1 do
-            self:Walk(cur.Value.args[i], toadd)
-            self:_instruction(toadd, self.Util:Push(self.Util.Eax))
+            self:Walk(cur.Value.args[i], arg)
+            self:_instruction(arg, self.Util:Push(self.Util.Eax))
         end
     elseif #cur.Value.args == 1 then
-        self:Walk(cur.Value.args[1], toadd)
-        self:_instruction(toadd, self.Util:Push(self.Util.Eax))
+        self:Walk(cur.Value.args[1], arg)
+        self:_instruction(arg, self.Util:Push(self.Util.Eax))
     end
     
-    
-    cur.Value = { name = cur.Value.base.Value, args = cur.Value.args, islocal = cur.Value.islocal, argsnum = #cur.Value.args }
+    cur.Value = { name = cur.Value.base.Value, args = arg, islocal = cur.Value.islocal, argsnum = #cur.Value.args }
     table.insert(toadd, cur)
 end
 
@@ -161,6 +166,7 @@ local NameToFunction = {
     IntegerLiteral = VisitorClass.Number,
     FloatLiteral = VisitorClass.Number,
     BooleanLiteral = VisitorClass.Boolean,
+    StringLiteral = VisitorClass.String,
     
     UnaryExpression = VisitorClass.UnaryExpression,
     ReturnStatement = VisitorClass.ReturnStatement,
