@@ -40,21 +40,23 @@ function CompilerFunctions:sprintf()
 end
 
 local PrintText = [[
-extern _puts
-print:
+extern _printf
+printf:
     push ebp
     mov ebp, esp
+    mov eax, [ebp + 12]
+    push eax
     mov eax, [ebp + 8]
     push eax
-    call _puts
-    add esp, 4
+    call _printf
+    add esp, 8
     pop ebp
     ret
 ]]
 
-function CompilerFunctions:print()
+function CompilerFunctions:printf()
     return self.Util:Text(PrintText), {
-        numargs = 1
+        numargs = 2
     }
 end
 

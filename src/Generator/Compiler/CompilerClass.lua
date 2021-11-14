@@ -74,11 +74,37 @@ function CompilerClass:StringLiteral(cur)
     else
         Log("Creating string: " .. cur.Value)
         name = GetHash(cur)
+        local value, body = cur.Value:sub(2, -2), {}
+        
+        local start, current = 1, 1
+        while true do
+            if current > #value then
+                table.insert(body, "'" .. value:sub(start, current - 1) .. "'")
+                break
+            end
+            local char = value:sub(current, current)
+            local next = value:sub(current + 1, current + 1)
+            if char == "\\" then
+                if current ~= 1 then
+                    table.insert(body, "'" .. value:sub(start, current - 1) .. "'")
+                end
+                if next == "n" then
+                    table.insert(body, "10")
+                elseif next == "\\" then
+                    table.insert(body, "'\\'")
+                elseif next == "t" then
+                    table.insert(body, "'    '")
+                end
+                current = current + 1
+                start = current + 1
+            end
+            current = current + 1
+        end
+        table.insert(body, "0")
+        
         table.insert(self.File.End, self.Util:DefineByte(
             "str_" .. name,
-            -- When we define the string we remove the start and end symbols
-            ("\'%s\'"):format(cur.Value:sub(2, -2)),
-            "0"
+            unpack(body)
         ))
         self.GlobalString[cur.Value] = name
     end
