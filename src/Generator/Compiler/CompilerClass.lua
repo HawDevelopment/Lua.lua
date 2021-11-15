@@ -408,11 +408,15 @@ do
         for _, value in pairs(cur.Value.stop) do
             table.insert(body, self:Walk(value))
         end
+        table.insert(body, self.Util:LocalVariable("__stop"))
+        for _, value in pairs(cur.Value.iter) do
+            table.insert(body, self:Walk(value))
+        end
         table.insert(body, self.Util:LocalVariable("__iter"))
         table.insert(body,self.Util:Label(name))
         
         local var = self.Util:_local("[ebp - " .. env[cur.Value.var.Value] .. "]")
-        local stop = self.Util:_local("[ebp - " .. env["__iter"] .. "]")
+        local stop = self.Util:_local("[ebp - " .. env["__stop"] .. "]")
         table.insert(body, {
             self.Util:Mov(self.Util.Eax, var),
             self.Util:Mov(self.Util.Ebx, stop),
@@ -430,7 +434,7 @@ do
         
         table.insert(body, {
             self.Util:Mov(self.Util.Eax, var),
-            self.Util:Add(self.Util.Eax, self.Util:Text("1")),
+            self.Util:Add(self.Util.Eax, self.Util:_local("[ebp - " .. env["__iter"] .. "]")),
             self.Util:Mov(var, self.Util.Eax)
         })
         

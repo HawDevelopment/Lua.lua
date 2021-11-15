@@ -1,13 +1,6 @@
 
-function Print()
-    local a = buffer()
-    strcpy(a, "Hello world")
-    printf("%s\n", a)
-    return
-end
-
-for i = 1, 10 do
-    Print()
+for i = 1, 10, 2 do
+    printf("%d\n", i)
 end
 
 return
