@@ -62,11 +62,7 @@ end
 
 local BufferText = [[
 buffer:
-    pop ecx
-    add esp, 256
-    mov eax, esp
-    mov [esp - 256], eax
-    push ecx
+    ; Boiler
     ret
 ]]
 
@@ -74,7 +70,14 @@ function CompilerFunctions:buffer()
     return self.Util:Text(BufferText), {
         numargs = 0,
         startasm = function ()
-            return self.Util:Text("\t; Created buffer\n")
+            local env = self.Class:GetEnv()
+            local pointer = env._ENV.Pointer
+            env._ENV.Pointer = pointer + 256
+            env._ENV.NumVars = env._ENV.NumVars + 64
+            return { 
+                self.Util:Text("\t; Created buffer\n"),
+                self.Util:Text("\tlea eax, [ebp - " .. tostring(pointer + 256 - 4) .. "]\n")
+            }
         end,
     }
 end
