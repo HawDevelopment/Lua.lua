@@ -53,6 +53,22 @@ function VisitorClass:BinaryExpression(cur, toadd)
     table.insert(toadd, cur)
 end
 
+function VisitorClass:MembershipExpression(cur, toadd)
+    self:Walk(cur.Value.name, toadd)
+    self:_instruction(toadd, self.Util:Text("\tsub eax, 1\n"))
+    
+    if cur.Value.base.Value == "argv" then
+        self:_instruction(toadd, self.Util:Mov(self.Util.Ebx, self.Util:Text(tostring(4))))
+        self:_instruction(toadd, self.Util:Mul(self.Util.Eax, self.Util.Ebx))
+    end
+    
+    self:_instruction(toadd, self.Util:Push(self.Util.Eax))
+    table.insert(toadd, { Name = "GetLocalExpression", Value = cur.Value.base.Value, Type = "Expression" })
+    self:_instruction(toadd, self.Util:Pop(self.Util.Ebx))
+    self:_instruction(toadd, self.Util:Add(self.Util.Eax, self.Util.Ebx))
+    self:_instruction(toadd, self.Util:Mov(self.Util.Eax, self.Util:Text("[eax]")))
+end
+
 function VisitorClass:ReturnStatement(cur, toadd)
     for _, value in pairs(cur.Value) do
         self:Walk(value, toadd)
@@ -171,6 +187,7 @@ local NameToFunction = {
     UnaryExpression = VisitorClass.UnaryExpression,
     ReturnStatement = VisitorClass.ReturnStatement,
     BinaryExpression = VisitorClass.BinaryExpression,
+    MembershipExpression = VisitorClass.MembershipExpression,
     FunctionStatement = VisitorClass.FunctionStatement,
     
     AssignmentStatement = VisitorClass.AssignmentStatement,

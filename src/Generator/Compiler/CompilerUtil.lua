@@ -66,17 +66,17 @@ end
 
 function CompilerUtil:Mul(cur, cur2)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Multiply", Value = { cur, cur2 } }
+    return { Name = "Mul", Value = { cur, cur2 } }
 end
 
 function CompilerUtil:Div(cur, cur2)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Divide", Value = { cur, cur2 } }
+    return { Name = "Div", Value = { cur, cur2 } }
 end
 
 function CompilerUtil:Neg(cur)
     assert(type(cur) == "table", "Expected table, got " .. type(cur))
-    return { Name = "Negate", Value = cur }
+    return { Name = "Neg", Value = cur }
 end
 
 function CompilerUtil:Or(cur, cur2)

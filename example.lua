@@ -1,6 +1,5 @@
 
-for i = 1, 10, 2 do
-    printf("%d\n", i)
-end
+local var = argv[2]
+printf("%s\n", var)
 
 return

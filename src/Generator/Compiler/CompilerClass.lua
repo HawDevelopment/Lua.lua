@@ -465,25 +465,33 @@ function CompilerClass:Run()
     self:_genOps()
     self:CreateEnv()
     local env = self:GetEnv()
-    env.EndName = GetHash(self)
+    env._ENV.EndName = GetHash(self)
     
-    self.Pointer = 4
+    env._ENV.Pointer = 12 -- we add 8 to add support for argv and argc
+    env._ENV.NumVars = 2
+    table.insert(self.File.Start, {
+        self.Util:Mov(self.Util.Eax, self.Util:Text("[ebp + 8]")),
+        self.Util:Mov(self.Util.Ebx, self.Util:Text("[ebp + 12]")),
+        self.Util:Mov(self.Util:Text("[ebp - 4]"), self.Util.Eax),
+        self.Util:Mov(self.Util:Text("[ebp - 8]"), self.Util.Ebx)
+    })
+    env["argc"] = env._ENV.Pointer - 8
+    env["argv"] = env._ENV.Pointer - 4
     
     while self.Head:GoNext() do
         table.insert(self.File.Start, self:Walk(self.Head:Current()))
     end
     
     env = self:GetEnv()
-    if env.EndName ~= GetHash(self) then
+    if env._ENV.EndName ~= GetHash(self) then
         error("Expected 'end'")
     end
     
     local vars = env._ENV.NumVars * 4
-    table.insert(self.File.Start, 1, self.Util:Text("\tsub esp, " .. vars .. "\n"))
+    table.insert(self.File.Start, 2, self.Util:Text("\tsub esp, " .. vars .. "\n"))
     if self.Head:Last().Name ~= "ReturnStatement" then
         table.insert(self.File.Start, self:ReturnStatement())
     end
-    
     
     return self.File
 end

@@ -104,7 +104,7 @@ function RenderClass:Mul(cur, isstrict)
     self:_strict(isstrict, true)
     local tomul1 = assert(self:Walk(cur.Value[1], true), "Expected a mul value")
     local tomul2 = assert(self:Walk(cur.Value[2], true), "Expected a mul value")
-    return "\tiadd " .. tomul1 .. ", " .. tomul2 .. "\n"
+    return "\tmov eax, " .. tomul1 .. "\n\timul " .. tomul2 .. "\n"
 end
 function RenderClass:Div(cur, isstrict)
     self:_strict(isstrict, true)
