@@ -123,6 +123,34 @@ function CompilerFunctions:strcat()
     }
 end
 
+local StrCmpText = [[
+extern _strcmp
+strcmp:
+    push ebp
+    mov ebp, esp
+    mov eax, [ebp + 12]
+    push eax
+    mov eax, [ebp + 8]
+    push eax
+    call _strcmp
+    add esp, 8
+    cmp eax, 0
+    jne strcmp_l1
+    mov eax, 1
+    jmp strcmp_end
+strcmp_l1:
+    mov eax, 0
+strcmp_end:
+    pop ebp
+    ret
+]]
+
+function CompilerFunctions:strcmp()
+    return self.Util:Text(StrCmpText), {
+        numargs = 2
+    }
+end
+
 local ScanfText = [[
 extern _scanf
 scanf:

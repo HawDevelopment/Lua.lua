@@ -1,6 +1,8 @@
 
 local var = buffer()
 scanf("%s", var)
-printf("%s\n", var)
+if strcmp(var, "Hello") then
+    printf("\n%s\n","Hello!")
+end
 
 return
