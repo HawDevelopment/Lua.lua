@@ -289,14 +289,14 @@ function CompilerClass:CallExpression(cur)
     
     assert(self.GlobalEnv[name], "Attemp to call function '" .. tostring(name) .. "' (a nil value)")
     local data = self.GlobalDataEnv[name]
-    if data and data.numargs and data.numargs ~= cur.Value.argsnum then
+    if data and data.numargs and data.numargs > cur.Value.argsnum then
         error("Function " .. name .. " expects " .. data.numargs .. " arguments, got " .. cur.Value.argsnum)
     end
     
     Log("Calling function: " .. name)
     local body = { }
     if data.startasm then
-        table.insert(body, data.startasm())
+        table.insert(body, data.startasm(cur.Value.args))
     end
     -- Do the args
     for _, value in pairs(cur.Value.args) do

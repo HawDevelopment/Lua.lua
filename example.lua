@@ -1,5 +1,6 @@
 
-local var = argv[2]
+local var = buffer()
+scanf("%s", var)
 printf("%s\n", var)
 
 return

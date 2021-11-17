@@ -123,4 +123,47 @@ function CompilerFunctions:strcat()
     }
 end
 
+local ScanfText = [[
+extern _scanf
+scanf:
+    push ebp
+    mov ebp, esp
+    mov eax, [ebp + 12]
+    push eax
+    mov eax, [ebp + 8]
+    push eax
+    call _scanf
+    add esp, 8
+    pop ebp
+    ret
+]]
+function CompilerFunctions:scanf()
+    return self.Util:Text(ScanfText), {
+        numargs = 2
+    }
+end
+
+local AddrText = [[
+addr:
+    ; Boiler
+    ret
+]]
+
+function CompilerFunctions:addr()
+    return self.Util:Text(AddrText), {
+        numargs = 0,
+        startasm = function (args)
+            if not args[1] then
+                error("Expected argument, got nil", 2)
+            end
+            local env = self.Class:GetEnv()
+            local pointer = env[args[1].Value]
+            args[1] = nil
+            -- We dont remove the push instruction
+            
+            return self.Util:Text("\tlea eax, [ebp - " .. pointer .. "]\n")
+        end
+    }
+end
+
 return CompilerFunctions
