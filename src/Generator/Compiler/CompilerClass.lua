@@ -339,8 +339,7 @@ do
                 -- If or elseif
                 local endpos = cur.Value[key + 1] and ("_else" .. name .. "_" .. key + 1) or ("_end" .. name)
                 table.insert(body, self:_genifstatement(value, endpos))
-                
-                if not value.body[#value.body].Name ~= "ReturnStatement" then
+                if not value.body[#value.body] or not value.body[#value.body].Name or not value.body[#value.body].Name ~= "ReturnStatement" then
                     table.insert(body, self.Util:Jmp(self.Util:Text("_end" .. name)))
                 end
                 

@@ -118,26 +118,27 @@ function RenderClass:Neg(cur, isstrict)
     local toneg = assert(self:Walk(cur.Value, true), "Expected a neg value")
     return "\tneg " .. toneg .. "\n"
 end
+local LogicalLabel = 1
 function RenderClass:Or(cur, isstrict)
     self:_strict(isstrict, true)
     local toor1 = assert(self:Walk(cur.Value[1], true), "Expected an or value")
     local toor2 = assert(self:Walk(cur.Value[2], true), "Expected an or value")
-    local hash = GetHash(cur)
-    local start = ("\tcmp %s, 1\n\tje _or%s\n\tcmp %s, 1\n\tje _or%s\n\tmov eax, 0\n\tjmp _end%s\n")
-        :format(toor1, hash, toor2, hash, hash)
-    local stop = ("_or%s:\n\tmov eax, 1\n\n_end%s:\n")
-        :format(hash, hash)
+    local start = ("\tcmp %s, 1\n\tje _or%d\n\tcmp %s, 1\n\tje _or%d\n\tmov eax, 0\n\tjmp _end%d\n")
+        :format(toor1, LogicalLabel, toor2, LogicalLabel, LogicalLabel)
+    local stop = ("_or%d:\n\tmov eax, 1\n\n_end%d:\n")
+        :format(LogicalLabel, LogicalLabel)
+    LogicalLabel = LogicalLabel + 1
     return start .. stop
 end
 function RenderClass:And(cur, isstrict)
     self:_strict(isstrict, true)
     local toand1 = assert(self:Walk(cur.Value[1], true), "Expected an and value")
     local toand2 = assert(self:Walk(cur.Value[2], true), "Expected an and value")
-    local hash = GetHash(cur)
-    local start = ("\tcmp %s, 1\n\tjne _and%s\n\tcmp %s, 1\n\tjne _and%s\n\tmov eax, 1\n\tjmp _end%s\n")
-        :format(toand1, hash, toand2, hash, hash)
-    local stop = ("_and%s:\n\tmov eax, 0\n\n_end%s:\n")
-        :format(hash, hash)
+    local start = ("\tcmp %s, 1\n\tjne _and%d\n\tcmp %s, 1\n\tjne _and%d\n\tmov eax, 1\n\tjmp _end%d\n")
+        :format(toand1, LogicalLabel, toand2, LogicalLabel, LogicalLabel)
+    local stop = ("_and%d:\n\tmov eax, 0\n\n_end%d:\n")
+        :format(LogicalLabel, LogicalLabel)
+    LogicalLabel = LogicalLabel + 1
     return start .. stop
 end
 
